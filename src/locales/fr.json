@@ -1,0 +1,220 @@
+{
+  "common": {
+    "home": "Accueil",
+    "products": "Produits",
+    "contact": "Contact",
+    "searchProducts": "Rechercher des produits...",
+    "language": "Langue",
+    "languageEnglish": "Anglais",
+    "languageFrench": "Français",
+    "languageArabic": "Arabe",
+    "account": "Compte",
+    "cart": "Panier",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "or": "OU",
+    "login": "Connexion",
+    "signup": "Inscription",
+    "rememberMe": "Se souvenir de moi",
+    "forgotPassword": "Mot de passe oublié ?",
+    "passwordShow": "Afficher le mot de passe",
+    "passwordHide": "Masquer le mot de passe",
+    "continueWithGoogle": "Continuer avec Google",
+    "continueWithFacebook": "Continuer avec Facebook"
+  },
+  "nav": {
+    "categories": "Catégories",
+    "categoryList": [
+      "Accessoires sanitaires",
+      "Plomberie et chauffage",
+      "Accessoires piscine"
+    ]
+  },
+  "catalog": {
+    "categories": {
+      "accessoireSanitaire": "Accessoires sanitaires",
+      "plomberieChauffage": "Plomberie et chauffage",
+      "accessoirePiscine": "Accessoires piscine"
+    },
+    "subtitles": {
+      "accessoireSanitaire": "Accessoires premium pour espaces sanitaires modernes",
+      "plomberieChauffage": "Essentiels fiables pour plomberie et chauffage",
+      "accessoirePiscine": "Solutions professionnelles pour installation et entretien piscine"
+    }
+  },
+  "hero": {
+    "title": "Solutions premium d'eau et de boissons",
+    "subtitle": "Un rafraîchissement de qualité livré à votre porte partout en Algérie",
+    "cta": "Acheter maintenant"
+  },
+  "homePage": {
+    "featuredTitle": "Produits vedettes",
+    "featuredSubtitle": "Une sélection premium de plomberie pour votre maison moderne ou vos projets professionnels",
+    "promoPill": "Offre limitée",
+    "promoTitle": "Obtenez 25% de réduction sur tous les systèmes d'eau",
+    "promoText": "Modernisez votre installation de plomberie avec des produits premium. Offre valable jusqu'au 15 mai 2026.",
+    "promoCta": "Profiter de l'offre",
+    "trustItems": [
+      { "title": "Livraison rapide", "desc": "Livraison nationale en 2 à 5 jours ouvrables" },
+      { "title": "Paiement sécurisé", "desc": "Transactions chiffrées SSL" },
+      { "title": "Produits de qualité", "desc": "Garantie 5 ans sur tous les produits" },
+      { "title": "Support 24h/24", "desc": "Service client expert" }
+    ]
+  },
+  "categories": {
+    "title": "Acheter par catégorie",
+    "items": [
+      { "name": "Accessoires sanitaires", "subtitle": "Accessoires premium pour espaces sanitaires modernes" },
+      { "name": "Plomberie et chauffage", "subtitle": "Essentiels fiables pour plomberie et chauffage" },
+      { "name": "Accessoires piscine", "subtitle": "Solutions professionnelles pour installation et entretien piscine" }
+    ]
+  },
+  "footer": {
+    "description": "Votre partenaire de confiance pour des solutions sanitaires et de plomberie premium depuis 2010.",
+    "quickLinks": "Liens rapides",
+    "customerService": "Service client",
+    "contactInfo": "Coordonnées",
+    "links": ["À propos", "Produits", "Services", "Blog", "Carrières"],
+    "serviceLinks": ["Contact", "Livraison", "Retours", "Garantie", "FAQ"],
+    "address": "123 Rue Plumbing, Alger",
+    "phone": "+213 (0) 555 123 456",
+    "email": "info@hkgoldwater.com",
+    "copyright": "© 2026 HKGoldWater. Tous droits réservés"
+  },
+  "contactPage": {
+    "title": "Contactez-nous",
+    "subtitle": "Vous avez des questions ? Écrivez-nous et nous vous répondrons rapidement.",
+    "phoneTitle": "Téléphone",
+    "phoneHours": "Lun-Sam 8h-18h",
+    "emailTitle": "E-mail",
+    "emailHint": "Réponse sous 24 heures",
+    "addressTitle": "Adresse",
+    "street": "123 Rue Plumbing",
+    "zone": "Zone industrielle, Alger",
+    "country": "Algérie"
+  },
+  "contactForm": {
+    "title": "Envoyez-nous un message",
+    "name": "Votre nom *",
+    "email": "Adresse e-mail *",
+    "phone": "Numéro de téléphone",
+    "subject": "Sujet *",
+    "message": "Message *",
+    "namePlaceholder": "John Doe",
+    "emailPlaceholder": "vous@exemple.com",
+    "phonePlaceholder": "+213 ...",
+    "subjectPlaceholder": "Comment pouvons-nous vous aider ?",
+    "messagePlaceholder": "Votre message...",
+    "submit": "Envoyer le message"
+  },
+  "auth": {
+    "welcomeBack": "Bon retour",
+    "loginSubtitle": "Connectez-vous pour continuer",
+    "createAccount": "Créer un compte",
+    "registerSubtitle": "Inscrivez-vous pour un nouveau compte",
+    "loginUsing": "Connexion via",
+    "phone": "Téléphone",
+    "email": "E-mail",
+    "phoneNumber": "Numéro de téléphone",
+    "password": "Mot de passe",
+    "enterPassword": "Saisissez votre mot de passe",
+    "fullName": "Nom complet",
+    "noAccount": "Vous n'avez pas de compte ?",
+    "haveAccount": "Vous avez déjà un compte ?",
+    "phonePlaceholder": "0555 12 34 56",
+    "emailPlaceholder": "vous@exemple.com",
+    "fullNamePlaceholder": "Ahmed Ben Ali",
+    "loginButton": "Connexion",
+    "createAccountButton": "Créer un compte"
+  },
+  "validation": {
+    "emailRequired": "L'e-mail est requis.",
+    "emailInvalid": "Saisissez une adresse e-mail valide.",
+    "phoneRequired": "Le numéro de téléphone est requis.",
+    "phoneInvalid": "Saisissez un numéro de téléphone valide.",
+    "passwordRequired": "Le mot de passe est requis.",
+    "passwordShort": "Le mot de passe doit contenir au moins 6 caractères.",
+    "fullNameRequired": "Le nom complet est requis."
+  },
+  "cartPage": {
+    "emptyTitle": "Votre panier est vide",
+    "emptyText": "Parcourez les produits et ajoutez des articles à votre panier.",
+    "goShopping": "Voir les produits",
+    "title": "Panier",
+    "item": "article",
+    "items": "articles",
+    "inYourCart": "dans votre panier"
+  },
+  "cart": {
+    "remove": "Supprimer {name}",
+    "decreaseQty": "Diminuer la quantité",
+    "increaseQty": "Augmenter la quantité",
+    "subtotal": "Sous-total :",
+    "summary": "Récapitulatif",
+    "shipping": "Livraison",
+    "total": "Total",
+    "freeShippingMore": "Ajoutez encore {amount} pour la livraison gratuite !",
+    "proceedCheckout": "Passer à la caisse",
+    "continueShopping": "Continuer vos achats",
+    "promoCode": "Code promo",
+    "promoPlaceholder": "Entrez le code promo",
+    "apply": "Appliquer",
+    "promoApplied": "Code promo appliqué — 10% de réduction (aperçu).",
+    "promoTry": "Essayez le code : SAVE10 pour 10% de réduction."
+  },
+  "checkout": {
+    "stepCart": "Panier",
+    "stepCheckout": "Paiement",
+    "stepComplete": "Terminé",
+    "deliveryInfo": "Informations de livraison",
+    "fullName": "Nom complet",
+    "phoneNumber": "Numéro de téléphone",
+    "wilaya": "Wilaya",
+    "commune": "Commune",
+    "address": "Adresse complète",
+    "selectWilaya": "Sélectionner la wilaya",
+    "selectWilayaFirst": "Sélectionnez d'abord une wilaya",
+    "selectCommune": "Sélectionner la commune",
+    "addressPlaceholder": "123 Rue Principale, Bâtiment A, Appartement 5",
+    "paymentMethod": "Mode de paiement",
+    "cashOnDelivery": "Paiement à la livraison",
+    "payOnReceive": "Payez à la réception",
+    "paymentHint": "Votre commande sera livrée à votre adresse. Vous payez uniquement à la réception.",
+    "orderSummary": "Récapitulatif",
+    "qty": "Qté",
+    "shippingFree": "Gratuit",
+    "confirmOrder": "Confirmer la commande",
+    "terms": "En validant votre commande, vous acceptez nos Conditions générales."
+  },
+  "orderComplete": {
+    "title": "Commande terminée",
+    "text": "Merci pour votre commande. Nous vous enverrons une confirmation sous peu.",
+    "continueShopping": "Continuer les achats",
+    "backHome": "Retour à l'accueil"
+  },
+  "listing": {
+    "shop": "Boutique",
+    "allProducts": "Tous les produits",
+    "showingProducts": "{count} produits affichés",
+    "sortBy": "Trier par :",
+    "featured": "En vedette",
+    "priceLowHigh": "Prix : croissant",
+    "priceHighLow": "Prix : décroissant",
+    "rating": "Note"
+  },
+  "filters": {
+    "title": "Filtres",
+    "clearAll": "Tout effacer",
+    "priceRange": "Fourchette de prix",
+    "category": "Catégorie",
+    "brand": "Marque",
+    "priceRangeLabel": "Filtre de fourchette de prix",
+    "minPrice": "Prix minimum",
+    "maxPrice": "Prix maximum",
+    "sliderHint": "Utilisez les flèches pour modifier la poignée active. Début et Fin vont aux extrêmes.",
+    "categories": ["Accessoires sanitaires", "Plomberie et chauffage", "Accessoires piscine"]
+  },
+  "productCard": {
+    "add": "Ajouter"
+  }
+}

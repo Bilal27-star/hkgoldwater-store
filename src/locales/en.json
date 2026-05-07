@@ -1,0 +1,220 @@
+{
+  "common": {
+    "home": "Home",
+    "products": "Products",
+    "contact": "Contact",
+    "searchProducts": "Search products...",
+    "language": "Language",
+    "languageEnglish": "English",
+    "languageFrench": "French",
+    "languageArabic": "Arabic",
+    "account": "Account",
+    "cart": "Shopping cart",
+    "previous": "Previous",
+    "next": "Next",
+    "or": "OR",
+    "login": "Login",
+    "signup": "Sign Up",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot Password?",
+    "passwordShow": "Show password",
+    "passwordHide": "Hide password",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithFacebook": "Continue with Facebook"
+  },
+  "nav": {
+    "categories": "Categories",
+    "categoryList": [
+      "Sanitary Accessories",
+      "Plumbing & Heating",
+      "Pool Accessories"
+    ]
+  },
+  "catalog": {
+    "categories": {
+      "accessoireSanitaire": "Sanitary Accessories",
+      "plomberieChauffage": "Plumbing & Heating",
+      "accessoirePiscine": "Pool Accessories"
+    },
+    "subtitles": {
+      "accessoireSanitaire": "Premium accessories for modern sanitary spaces",
+      "plomberieChauffage": "Reliable plumbing and heating essentials",
+      "accessoirePiscine": "Professional pool maintenance and setup solutions"
+    }
+  },
+  "hero": {
+    "title": "Premium Water & Beverage Solutions",
+    "subtitle": "Quality refreshment delivered to your doorstep across Algeria",
+    "cta": "Shop Now"
+  },
+  "homePage": {
+    "featuredTitle": "Featured Products",
+    "featuredSubtitle": "Handpicked premium plumbing fixtures for your modern home or commercial projects",
+    "promoPill": "Limited Time Offer",
+    "promoTitle": "Get 25% Off on All Water Systems",
+    "promoText": "Upgrade your plumbing infrastructure with premium quality products. Offer valid until May 15, 2026.",
+    "promoCta": "Claim Discount",
+    "trustItems": [
+      { "title": "Fast Delivery", "desc": "2-5 business days nationwide shipping" },
+      { "title": "Secure Payment", "desc": "SSL encrypted transactions" },
+      { "title": "Quality Products", "desc": "5-year warranty on all products" },
+      { "title": "24/7 Support", "desc": "Expert customer service team" }
+    ]
+  },
+  "categories": {
+    "title": "Shop by Category",
+    "items": [
+      { "name": "Sanitary Accessories", "subtitle": "Premium accessories for modern sanitary spaces" },
+      { "name": "Plumbing & Heating", "subtitle": "Reliable plumbing and heating essentials" },
+      { "name": "Pool Accessories", "subtitle": "Professional pool maintenance and setup solutions" }
+    ]
+  },
+  "footer": {
+    "description": "Your trusted partner for premium plumbing and sanitary solutions since 2010.",
+    "quickLinks": "Quick Links",
+    "customerService": "Customer Service",
+    "contactInfo": "Contact Info",
+    "links": ["About Us", "Products", "Services", "Blog", "Careers"],
+    "serviceLinks": ["Contact", "Shipping Info", "Returns", "Warranty", "FAQs"],
+    "address": "123 Plumbing Street, Algiers",
+    "phone": "+213 (0) 555 123 456",
+    "email": "info@hkgoldwater.com",
+    "copyright": "© 2026 HKGoldWater. All rights reserved"
+  },
+  "contactPage": {
+    "title": "Get in Touch",
+    "subtitle": "Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.",
+    "phoneTitle": "Phone",
+    "phoneHours": "Mon-Sat 8AM-6PM",
+    "emailTitle": "Email",
+    "emailHint": "We'll reply within 24 hours",
+    "addressTitle": "Address",
+    "street": "123 Plumbing Street",
+    "zone": "Industrial Zone, Algiers",
+    "country": "Algeria"
+  },
+  "contactForm": {
+    "title": "Send us a Message",
+    "name": "Your Name *",
+    "email": "Email Address *",
+    "phone": "Phone Number",
+    "subject": "Subject *",
+    "message": "Message *",
+    "namePlaceholder": "John Doe",
+    "emailPlaceholder": "you@example.com",
+    "phonePlaceholder": "+213 ...",
+    "subjectPlaceholder": "How can we help?",
+    "messagePlaceholder": "Your message...",
+    "submit": "Send Message"
+  },
+  "auth": {
+    "welcomeBack": "Welcome Back",
+    "loginSubtitle": "Sign in to your account to continue",
+    "createAccount": "Create Account",
+    "registerSubtitle": "Register for a new account",
+    "loginUsing": "Login using",
+    "phone": "Phone",
+    "email": "Email",
+    "phoneNumber": "Phone number",
+    "password": "Password",
+    "enterPassword": "Enter your password",
+    "fullName": "Full Name",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "phonePlaceholder": "0555 12 34 56",
+    "emailPlaceholder": "you@example.com",
+    "fullNamePlaceholder": "Ahmed Ben Ali",
+    "loginButton": "Login",
+    "createAccountButton": "Create Account"
+  },
+  "validation": {
+    "emailRequired": "Email is required.",
+    "emailInvalid": "Enter a valid email address.",
+    "phoneRequired": "Phone number is required.",
+    "phoneInvalid": "Enter a valid phone number.",
+    "passwordRequired": "Password is required.",
+    "passwordShort": "Password must be at least 6 characters.",
+    "fullNameRequired": "Full name is required."
+  },
+  "cartPage": {
+    "emptyTitle": "Your cart is empty",
+    "emptyText": "Browse products and add items to your cart.",
+    "goShopping": "Go Shopping",
+    "title": "Shopping Cart",
+    "item": "item",
+    "items": "items",
+    "inYourCart": "in your cart"
+  },
+  "cart": {
+    "remove": "Remove {name}",
+    "decreaseQty": "Decrease quantity",
+    "increaseQty": "Increase quantity",
+    "subtotal": "Subtotal:",
+    "summary": "Order Summary",
+    "shipping": "Shipping",
+    "total": "Total",
+    "freeShippingMore": "Add {amount} more for free shipping!",
+    "proceedCheckout": "Proceed to Checkout",
+    "continueShopping": "Continue Shopping",
+    "promoCode": "Promo Code",
+    "promoPlaceholder": "Enter promo code",
+    "apply": "Apply",
+    "promoApplied": "Promo applied — 10% off (preview).",
+    "promoTry": "Try code: SAVE10 for 10% off."
+  },
+  "checkout": {
+    "stepCart": "Cart",
+    "stepCheckout": "Checkout",
+    "stepComplete": "Complete",
+    "deliveryInfo": "Delivery Information",
+    "fullName": "Full Name",
+    "phoneNumber": "Phone Number",
+    "wilaya": "Wilaya",
+    "commune": "Commune",
+    "address": "Full Address",
+    "selectWilaya": "Select wilaya",
+    "selectWilayaFirst": "Select wilaya first",
+    "selectCommune": "Select commune",
+    "addressPlaceholder": "123 Main Street, Building A, Apartment 5",
+    "paymentMethod": "Payment Method",
+    "cashOnDelivery": "Cash on Delivery",
+    "payOnReceive": "Pay when you receive your order",
+    "paymentHint": "Your order will be delivered to your address. You only pay when you receive your products.",
+    "orderSummary": "Order Summary",
+    "qty": "Qty",
+    "shippingFree": "Free",
+    "confirmOrder": "Confirm Order",
+    "terms": "By placing your order, you agree to our Terms and Conditions"
+  },
+  "orderComplete": {
+    "title": "Order complete",
+    "text": "Thank you for your order. We'll send you a confirmation shortly.",
+    "continueShopping": "Continue shopping",
+    "backHome": "Back to home"
+  },
+  "listing": {
+    "shop": "Shop",
+    "allProducts": "All Products",
+    "showingProducts": "Showing {count} products",
+    "sortBy": "Sort by:",
+    "featured": "Featured",
+    "priceLowHigh": "Price: Low to High",
+    "priceHighLow": "Price: High to Low",
+    "rating": "Rating"
+  },
+  "filters": {
+    "title": "Filters",
+    "clearAll": "Clear All",
+    "priceRange": "Price Range",
+    "category": "Category",
+    "brand": "Brand",
+    "priceRangeLabel": "Price range filter",
+    "minPrice": "Minimum price",
+    "maxPrice": "Maximum price",
+    "sliderHint": "Use arrow keys to change the focused handle. Home and End jump to the lowest and highest price on the slider.",
+    "categories": ["Sanitary Accessories", "Plumbing & Heating", "Pool Accessories"]
+  },
+  "productCard": {
+    "add": "Add"
+  }
+}

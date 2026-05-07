@@ -1,0 +1,220 @@
+{
+  "common": {
+    "home": "الرئيسية",
+    "products": "المنتجات",
+    "contact": "اتصل بنا",
+    "searchProducts": "ابحث عن المنتجات...",
+    "language": "اللغة",
+    "languageEnglish": "الإنجليزية",
+    "languageFrench": "الفرنسية",
+    "languageArabic": "العربية",
+    "account": "الحساب",
+    "cart": "سلة التسوق",
+    "previous": "السابق",
+    "next": "التالي",
+    "or": "أو",
+    "login": "تسجيل الدخول",
+    "signup": "إنشاء حساب",
+    "rememberMe": "تذكرني",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "passwordShow": "إظهار كلمة المرور",
+    "passwordHide": "إخفاء كلمة المرور",
+    "continueWithGoogle": "المتابعة باستخدام Google",
+    "continueWithFacebook": "المتابعة باستخدام Facebook"
+  },
+  "nav": {
+    "categories": "الفئات",
+    "categoryList": [
+      "اكسسوارات صحية",
+      "السباكة والتدفئة",
+      "اكسسوارات المسابح"
+    ]
+  },
+  "catalog": {
+    "categories": {
+      "accessoireSanitaire": "اكسسوارات صحية",
+      "plomberieChauffage": "السباكة والتدفئة",
+      "accessoirePiscine": "اكسسوارات المسابح"
+    },
+    "subtitles": {
+      "accessoireSanitaire": "اكسسوارات مميزة للمساحات الصحية العصرية",
+      "plomberieChauffage": "حلول موثوقة لأعمال السباكة والتدفئة",
+      "accessoirePiscine": "منتجات احترافية لتجهيز وصيانة المسابح"
+    }
+  },
+  "hero": {
+    "title": "حلول مياه ومشروبات عالية الجودة",
+    "subtitle": "انتعاش بجودة ممتازة يصل إلى باب منزلك في جميع أنحاء الجزائر",
+    "cta": "تسوق الآن"
+  },
+  "homePage": {
+    "featuredTitle": "منتجات مميزة",
+    "featuredSubtitle": "مختارات ممتازة من تجهيزات السباكة لمنزلك الحديث أو مشاريعك التجارية",
+    "promoPill": "عرض لفترة محدودة",
+    "promoTitle": "احصل على خصم 25٪ على جميع أنظمة المياه",
+    "promoText": "قم بتطوير البنية التحتية للسباكة بمنتجات ممتازة. العرض صالح حتى 15 مايو 2026.",
+    "promoCta": "احصل على الخصم",
+    "trustItems": [
+      { "title": "توصيل سريع", "desc": "توصيل وطني خلال 2-5 أيام عمل" },
+      { "title": "دفع آمن", "desc": "معاملات مشفرة SSL" },
+      { "title": "منتجات عالية الجودة", "desc": "ضمان 5 سنوات على جميع المنتجات" },
+      { "title": "دعم 24/7", "desc": "فريق خدمة عملاء خبير" }
+    ]
+  },
+  "categories": {
+    "title": "تسوق حسب الفئة",
+    "items": [
+      { "name": "اكسسوارات صحية", "subtitle": "اكسسوارات مميزة للمساحات الصحية العصرية" },
+      { "name": "السباكة والتدفئة", "subtitle": "حلول موثوقة لأعمال السباكة والتدفئة" },
+      { "name": "اكسسوارات المسابح", "subtitle": "منتجات احترافية لتجهيز وصيانة المسابح" }
+    ]
+  },
+  "footer": {
+    "description": "شريككم الموثوق لحلول السباكة والصرف الصحي عالية الجودة منذ 2010.",
+    "quickLinks": "روابط سريعة",
+    "customerService": "خدمة العملاء",
+    "contactInfo": "معلومات التواصل",
+    "links": ["من نحن", "المنتجات", "الخدمات", "المدونة", "الوظائف"],
+    "serviceLinks": ["اتصل بنا", "معلومات الشحن", "الاسترجاع", "الضمان", "الأسئلة الشائعة"],
+    "address": "123 شارع Plumbing، الجزائر",
+    "phone": "+213 (0) 555 123 456",
+    "email": "info@hkgoldwater.com",
+    "copyright": "© 2026 HKGoldWater. جميع الحقوق محفوظة"
+  },
+  "contactPage": {
+    "title": "تواصل معنا",
+    "subtitle": "هل لديك أسئلة؟ يسعدنا التواصل معك. أرسل لنا رسالة وسنرد عليك في أقرب وقت.",
+    "phoneTitle": "الهاتف",
+    "phoneHours": "من الإثنين إلى السبت 8 ص - 6 م",
+    "emailTitle": "البريد الإلكتروني",
+    "emailHint": "سنرد خلال 24 ساعة",
+    "addressTitle": "العنوان",
+    "street": "123 شارع Plumbing",
+    "zone": "المنطقة الصناعية، الجزائر",
+    "country": "الجزائر"
+  },
+  "contactForm": {
+    "title": "أرسل لنا رسالة",
+    "name": "الاسم *",
+    "email": "البريد الإلكتروني *",
+    "phone": "رقم الهاتف",
+    "subject": "الموضوع *",
+    "message": "الرسالة *",
+    "namePlaceholder": "John Doe",
+    "emailPlaceholder": "you@example.com",
+    "phonePlaceholder": "+213 ...",
+    "subjectPlaceholder": "كيف يمكننا مساعدتك؟",
+    "messagePlaceholder": "رسالتك...",
+    "submit": "إرسال الرسالة"
+  },
+  "auth": {
+    "welcomeBack": "مرحبًا بعودتك",
+    "loginSubtitle": "قم بتسجيل الدخول إلى حسابك للمتابعة",
+    "createAccount": "إنشاء حساب",
+    "registerSubtitle": "سجّل للحصول على حساب جديد",
+    "loginUsing": "تسجيل الدخول عبر",
+    "phone": "الهاتف",
+    "email": "البريد الإلكتروني",
+    "phoneNumber": "رقم الهاتف",
+    "password": "كلمة المرور",
+    "enterPassword": "أدخل كلمة المرور",
+    "fullName": "الاسم الكامل",
+    "noAccount": "ليس لديك حساب؟",
+    "haveAccount": "لديك حساب بالفعل؟",
+    "phonePlaceholder": "0555 12 34 56",
+    "emailPlaceholder": "you@example.com",
+    "fullNamePlaceholder": "Ahmed Ben Ali",
+    "loginButton": "تسجيل الدخول",
+    "createAccountButton": "إنشاء حساب"
+  },
+  "validation": {
+    "emailRequired": "البريد الإلكتروني مطلوب.",
+    "emailInvalid": "يرجى إدخال بريد إلكتروني صحيح.",
+    "phoneRequired": "رقم الهاتف مطلوب.",
+    "phoneInvalid": "يرجى إدخال رقم هاتف صحيح.",
+    "passwordRequired": "كلمة المرور مطلوبة.",
+    "passwordShort": "يجب أن تكون كلمة المرور 6 أحرف على الأقل.",
+    "fullNameRequired": "الاسم الكامل مطلوب."
+  },
+  "cartPage": {
+    "emptyTitle": "سلة التسوق فارغة",
+    "emptyText": "تصفح المنتجات وأضف العناصر إلى سلتك.",
+    "goShopping": "اذهب للتسوق",
+    "title": "سلة التسوق",
+    "item": "عنصر",
+    "items": "عناصر",
+    "inYourCart": "في سلتك"
+  },
+  "cart": {
+    "remove": "إزالة {name}",
+    "decreaseQty": "تقليل الكمية",
+    "increaseQty": "زيادة الكمية",
+    "subtotal": "المجموع الفرعي:",
+    "summary": "ملخص الطلب",
+    "shipping": "الشحن",
+    "total": "الإجمالي",
+    "freeShippingMore": "أضف {amount} إضافية للحصول على شحن مجاني!",
+    "proceedCheckout": "المتابعة إلى الدفع",
+    "continueShopping": "متابعة التسوق",
+    "promoCode": "رمز الخصم",
+    "promoPlaceholder": "أدخل رمز الخصم",
+    "apply": "تطبيق",
+    "promoApplied": "تم تطبيق الرمز — خصم 10٪ (معاينة).",
+    "promoTry": "جرّب الرمز: SAVE10 للحصول على خصم 10٪."
+  },
+  "checkout": {
+    "stepCart": "السلة",
+    "stepCheckout": "الدفع",
+    "stepComplete": "اكتمل",
+    "deliveryInfo": "معلومات التوصيل",
+    "fullName": "الاسم الكامل",
+    "phoneNumber": "رقم الهاتف",
+    "wilaya": "الولاية",
+    "commune": "البلدية",
+    "address": "العنوان الكامل",
+    "selectWilaya": "اختر الولاية",
+    "selectWilayaFirst": "اختر الولاية أولاً",
+    "selectCommune": "اختر البلدية",
+    "addressPlaceholder": "123 الشارع الرئيسي، العمارة A، الشقة 5",
+    "paymentMethod": "طريقة الدفع",
+    "cashOnDelivery": "الدفع عند الاستلام",
+    "payOnReceive": "ادفع عند استلام الطلب",
+    "paymentHint": "سيتم توصيل طلبك إلى عنوانك. تدفع فقط عند استلام المنتجات.",
+    "orderSummary": "ملخص الطلب",
+    "qty": "الكمية",
+    "shippingFree": "مجاني",
+    "confirmOrder": "تأكيد الطلب",
+    "terms": "بإتمام الطلب، فإنك توافق على الشروط والأحكام."
+  },
+  "orderComplete": {
+    "title": "تم إكمال الطلب",
+    "text": "شكرًا لطلبك. سنرسل لك تأكيدًا قريبًا.",
+    "continueShopping": "متابعة التسوق",
+    "backHome": "العودة للرئيسية"
+  },
+  "listing": {
+    "shop": "المتجر",
+    "allProducts": "كل المنتجات",
+    "showingProducts": "عرض {count} منتج",
+    "sortBy": "الترتيب حسب:",
+    "featured": "مميز",
+    "priceLowHigh": "السعر: من الأقل إلى الأعلى",
+    "priceHighLow": "السعر: من الأعلى إلى الأقل",
+    "rating": "التقييم"
+  },
+  "filters": {
+    "title": "الفلاتر",
+    "clearAll": "مسح الكل",
+    "priceRange": "نطاق السعر",
+    "category": "الفئة",
+    "brand": "العلامة",
+    "priceRangeLabel": "فلتر نطاق السعر",
+    "minPrice": "الحد الأدنى للسعر",
+    "maxPrice": "الحد الأقصى للسعر",
+    "sliderHint": "استخدم مفاتيح الأسهم لتغيير المقبض. Home و End ينقلان لأدنى وأعلى قيمة.",
+    "categories": ["اكسسوارات صحية", "السباكة والتدفئة", "اكسسوارات المسابح"]
+  },
+  "productCard": {
+    "add": "إضافة"
+  }
+}

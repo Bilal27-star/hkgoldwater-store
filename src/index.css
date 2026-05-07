@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body.font-ar {
+  font-family: "Cairo", Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+[dir="rtl"] .text-ellipsis-safe {
+  text-align: right;
+}
