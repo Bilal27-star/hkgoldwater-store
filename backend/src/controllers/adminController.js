@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -96,6 +97,54 @@ export async function deleteAdmin(req, res) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete admin";
     console.error("[admin.delete] error", message);
+    return res.status(500).json({ error: message });
+  }
+}
+
+export async function loginAdmin(req, res) {
+  const email = asText(req.body?.email).toLowerCase();
+  const password = asText(req.body?.password);
+  if (!email || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
+
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ error: "JWT_SECRET is not configured" });
+  }
+
+  try {
+    const supabase = req.app.locals.supabase;
+    const { data, error } = await supabase
+      .from("admins")
+      .select("id,name,email,role,password_hash")
+      .eq("email", email)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data?.password_hash) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const valid = await bcrypt.compare(password, data.password_hash);
+    if (!valid) return res.status(401).json({ error: "Invalid email or password" });
+
+    const token = jwt.sign(
+      { id: data.id, email: data.email, role: data.role || "admin" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: data.id,
+        email: data.email,
+        name: data.name ?? "Admin",
+        role: data.role ?? "admin"
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to login admin";
+    console.error("[admin.login] error", message);
     return res.status(500).json({ error: message });
   }
 }

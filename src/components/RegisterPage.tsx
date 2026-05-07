@@ -12,7 +12,7 @@ import { Link, useNavigate } from "react-router-dom";
 import BrandLogo from "./BrandLogo";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
-import { getErrorMessage, registerApi, setToken } from "../api";
+import { getErrorMessage, registerApi } from "../api";
 
 type LoginType = "phone" | "email";
 
@@ -33,6 +33,7 @@ export default function RegisterPage() {
   const [remember, setRemember] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const isFormValid = useMemo(() => {
@@ -75,20 +76,20 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitError("");
+    setSubmitSuccess("");
     if (loginType !== "email") {
       setSubmitError("Please choose Email — registration requires an email address.");
       return;
     }
     setSubmitting(true);
     try {
-      const data = {
+      await registerApi({
         name: fullName.trim(),
         email: email.trim(),
-        password
-      };
-      console.log("REGISTER DATA:", data);
-      const res = await registerApi(data);
-      if (res?.token) setToken(res.token);
+        password,
+        phone: loginType === "phone" ? phone.trim() : null
+      });
+      setSubmitSuccess("Account created successfully. You can now log in.");
       navigate("/login", { replace: true });
     } catch (err) {
       setSubmitError(getErrorMessage(err, "Registration failed"));
@@ -319,6 +320,11 @@ export default function RegisterPage() {
             {submitError ? (
               <p className="text-sm text-red-600" role="alert">
                 {submitError}
+              </p>
+            ) : null}
+            {submitSuccess ? (
+              <p className="text-sm text-emerald-600" role="status">
+                {submitSuccess}
               </p>
             ) : null}
           </form>

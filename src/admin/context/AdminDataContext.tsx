@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { createProductApi, deleteProductApi, getCategories, getProducts } from "../../api";
+import { createProductApi, deleteProductApi, getCategories, getProductsApi } from "../../api";
 import { ADMIN_DATA_STORAGE_KEY } from "../constants";
 import {
   defaultSettings,
@@ -54,6 +54,8 @@ function saveStore(store: AdminStore) {
 
 type AdminDataContextValue = {
   products: AdminProduct[];
+  productsLoading: boolean;
+  productsError: string | null;
   categories: AdminCategory[];
   orders: AdminOrder[];
   customers: AdminCustomer[];
@@ -74,6 +76,8 @@ const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [store, setStore] = useState<AdminStore>(() => loadStore());
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
 
   const resolveLocalizedText = useCallback((value: unknown) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -125,8 +129,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProducts = useCallback(async () => {
+    setProductsLoading(true);
+    setProductsError(null);
     try {
-      const data = await getProducts();
+      const data = await getProductsApi();
       const rows = Array.isArray(data)
         ? data
         : data && typeof data === "object" && Array.isArray((data as { items?: unknown[] }).items)
@@ -138,6 +144,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }));
     } catch (error) {
       console.error("[admin.products] refresh failed", error);
+      setProductsError("Failed to load products.");
+    } finally {
+      setProductsLoading(false);
     }
   }, [mapApiProductToAdminProduct, setAndPersist]);
 
@@ -300,6 +309,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AdminDataContextValue>(
     () => ({
       products: store.products,
+      productsLoading,
+      productsError,
       categories: store.categories,
       orders: store.orders,
       customers: store.customers,
@@ -316,6 +327,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       store,
+      productsLoading,
+      productsError,
       addProduct,
       updateProduct,
       deleteProduct,

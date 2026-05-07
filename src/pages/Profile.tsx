@@ -7,7 +7,7 @@ import OrdersSection from "../components/profile/OrdersSection";
 import type { OrderRow } from "../components/profile/OrdersSection";
 import ProfilePageSkeleton from "../components/profile/ProfilePageSkeleton";
 import ProfileSecuritySection from "../components/profile/ProfileSecuritySection";
-import { API_URL } from "../api";
+import { getOrdersApi } from "../api";
 import { useAuth } from "../context/AuthContext";
 
 export default function Profile() {
@@ -27,11 +27,7 @@ export default function Profile() {
     setOrdersLoading(true);
     setOrdersError("");
     try {
-      const res = await fetch(`${API_URL}/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error("Could not load orders");
-      const data = (await res.json()) as OrderRow[];
+      const data = (await getOrdersApi()) as OrderRow[];
       setOrders(Array.isArray(data) ? data : []);
     } catch {
       setOrdersError("Unable to load your orders.");
@@ -57,7 +53,7 @@ export default function Profile() {
 
   const handleLogout = () => {
     logout();
-    navigate("/", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   if (!isAuthenticated) {

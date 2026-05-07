@@ -5,17 +5,39 @@ import { useI18n } from "../i18n/I18nProvider";
 
 const CATEGORY_ICONS = [Droplet, Wrench, Move, Box];
 
-export default function Categories() {
+type CategoriesProps = {
+  categories?: Array<{ id: string; name: string }>;
+};
+
+export default function Categories({ categories: externalCategories }: CategoriesProps) {
   const { t } = useI18n();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [categoryItems, setCategoryItems] = useState<
     Array<{ id: string; name: string; subtitle: string; Icon: typeof Droplet }>
   >([]);
 
   useEffect(() => {
+    if (externalCategories && externalCategories.length > 0) {
+      const mapped = externalCategories.map((category, idx) => ({
+        id: String(category.id),
+        name: String(category.name || ""),
+        subtitle: t("categories.subtitle"),
+        Icon: CATEGORY_ICONS[idx % CATEGORY_ICONS.length]
+      }));
+      setCategoryItems(mapped);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     async function loadCategories() {
+      setLoading(true);
+      setError(null);
       try {
         const data = await getCategories();
+        console.log("CATEGORIES:", data);
         const rows = Array.isArray(data) ? data : [];
         const mapped = rows.map((category: any, idx: number) => ({
           id: String(category.id),
@@ -26,14 +48,19 @@ export default function Categories() {
         if (!cancelled) setCategoryItems(mapped);
       } catch (error) {
         console.error("[Categories] failed to fetch categories", error);
-        if (!cancelled) setCategoryItems([]);
+        if (!cancelled) {
+          setCategoryItems([]);
+          setError("Failed to load categories.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     loadCategories();
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, externalCategories]);
 
   return (
     <section id="categories" className="bg-[#f8fafe] py-16">
@@ -41,6 +68,8 @@ export default function Categories() {
         <h2 className="text-center text-[30px] font-semibold leading-tight text-[#0B3D91]">
           {t("categories.title")}
         </h2>
+        {loading ? <p className="mt-4 text-center text-sm text-gray-600">Loading categories...</p> : null}
+        {error ? <p className="mt-4 text-center text-sm text-red-600">{error}</p> : null}
         <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 justify-items-center gap-6 md:grid-cols-2 xl:grid-cols-3">
           {categoryItems.map(({ id, name, subtitle, Icon }, idx) => {
             return (

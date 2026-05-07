@@ -33,7 +33,7 @@ export default function Navbar() {
   const { totalItems } = useCart();
   const { language, setLanguage, t } = useI18n();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, token, user } = useAuth();
+  const { isAuthenticated, token, user } = useAuth();
   const { settings } = useSiteContent();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -77,11 +77,10 @@ export default function Navbar() {
   useEffect(() => {
     console.log("navbar auth state", {
       isAuthenticated,
-      loading,
       hasToken: !!token,
       userId: user?.id
     });
-  }, [isAuthenticated, loading, token, user?.id]);
+  }, [isAuthenticated, token, user?.id]);
 
   function resolveProfileTarget(): string {
     return isAuthenticated ? "/profile" : "/login";
@@ -238,7 +237,6 @@ export default function Navbar() {
               console.log("profile navigation triggered", { target });
               console.log("navbar auth state", {
                 isAuthenticated,
-                loading,
                 hasToken: !!token,
                 userId: user?.id
               });

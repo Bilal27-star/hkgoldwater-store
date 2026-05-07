@@ -11,9 +11,8 @@ import { Link, useNavigate } from "react-router-dom";
 import BrandLogo from "./BrandLogo";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
-import { getErrorMessage, loginApi } from "../api";
-import { useAuth } from "../context/AuthContext";
-import type { AuthUser } from "../context/AuthContext";
+import { API_BASE_URL } from "../api/config";
+import { setToken } from "../api";
 
 type LoginType = "phone" | "email";
 
@@ -25,7 +24,6 @@ const inputShell =
 export default function LoginPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [loginType, setLoginType] = useState<LoginType>("phone");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -61,21 +59,27 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitError("");
+    if (loginType !== "email") {
+      setSubmitError("Please choose Email to sign in.");
+      return;
+    }
     setSubmitting(true);
     try {
-      const payload =
-        loginType === "email"
-          ? { email: email.trim(), password }
-          : { phone: phone.trim(), password };
-      console.log("LOGIN DATA:", payload);
-      const data = (await loginApi(payload)) as {
-        token?: string;
-        user?: AuthUser;
-      };
-      if (data?.token) login(data.token, data.user ?? undefined);
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+      const data = (await response.json()) as { token?: string; message?: string };
+      if (data.token) {
+        setToken(data.token);
+      } else {
+        setSubmitError(data.message || "Login failed");
+        return;
+      }
       navigate("/", { replace: true });
-    } catch (err) {
-      setSubmitError(getErrorMessage(err, "Login failed"));
+    } catch {
+      setSubmitError("Login failed");
     } finally {
       setSubmitting(false);
     }

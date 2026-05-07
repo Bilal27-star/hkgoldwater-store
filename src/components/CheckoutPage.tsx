@@ -15,7 +15,7 @@ import { Navigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useI18n } from "../i18n/I18nProvider";
 import SiteFooter from "./SiteFooter";
-import { API_URL, getToken } from "../api";
+import { createOrderApi, getToken } from "../api";
 
 type CheckoutForm = {
   fullName: string;
@@ -257,38 +257,12 @@ export default function CheckoutPage() {
 
     try {
       await ensureServerCartForCheckout();
-
-      console.log("FORM:", form);
-      console.log("PAYLOAD:", orderPayload);
-
-      const token = getToken();
-      const res = await fetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(orderPayload)
-      });
-
-      let data: { id?: string; error?: string } | null = null;
-      try {
-        data = (await res.json()) as { id?: string; error?: string };
-      } catch {
-        data = null;
+      const data = (await createOrderApi(orderPayload)) as { id?: string };
+      if (data?.id) {
+        sessionStorage.setItem("checkout_order_id", String(data.id));
       }
-
-      if (res.ok) {
-        if (data?.id) {
-          sessionStorage.setItem("checkout_order_id", String(data.id));
-        }
-      
-        clearCart();
-        window.location.href = "/order-success";
-      } else {
-        console.error(data);
-        setSubmitError(data?.error ?? res.statusText ?? "Order failed");
-      }
+      clearCart();
+      window.location.href = "/order-success";
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to place order");
     }

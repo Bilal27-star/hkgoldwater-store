@@ -7,22 +7,11 @@ export const TOKEN_KEY: string;
 export const AUTH_CHANGED_EVENT: string;
 export function getErrorMessage(error: unknown, fallback?: string): string;
 
-export function loginApi(credentials: {
-  email?: string;
-  phone?: string;
-  password: string;
-}): Promise<any>;
-
-export function registerApi(body: {
-  name: string;
-  email: string;
-  password: string;
-}): Promise<any>;
-
 export function getProducts(params?: Record<string, string | number | undefined>): Promise<any>;
+export function getProductsApi(params?: Record<string, string | number | undefined>): Promise<any>;
 export function getProductByIdApi(productId: string): Promise<any>;
 export function getCategories(): Promise<any>;
-export function getBrands(categoryId: string): Promise<any>;
+export function getBrands(categoryId?: string): Promise<any>;
 export function getSettings(): Promise<any>;
 export function patchSettings(payload: {
   storeName: string;
@@ -56,6 +45,21 @@ export function addToCartApi(payload: {
 export function getCartApi(): Promise<any>;
 
 export function createOrderApi(payload?: any): Promise<any>;
+export function getOrdersApi(): Promise<any>;
+export function loginApi(payload: { email: string; password: string }): Promise<any>;
+export function registerApi(payload: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string | null;
+}): Promise<any>;
+export function getAuthMeApi(): Promise<any>;
+export function getProfileApi(): Promise<any>;
+export function getUserProfileApi(): Promise<any>;
+export function updateProfileApi(body: Record<string, unknown>): Promise<Record<string, unknown>>;
+export function patchUserProfile(body: Record<string, unknown>): Promise<Record<string, unknown>>;
+export function logoutApi(): Promise<any>;
+export function adminLoginApi(payload: { email: string; password: string }): Promise<any>;
 export function getAdminsApi(): Promise<any>;
 export function createAdminApi(payload: {
   name: string;

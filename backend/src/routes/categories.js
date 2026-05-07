@@ -6,17 +6,14 @@ router.get("/", async (req, res) => {
   try {
     console.log("[route-hit] GET /api/categories");
     const supabase = req.app.locals.supabase;
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id,name,created_at")
-      .order("id", { ascending: true });
-
+    const { data, error } = await supabase.from("categories").select("id,name");
+    console.log("CATEGORIES RAW:", data);
+    console.log("ERROR:", error);
     if (error) {
-      console.error("[categories.list] error", error);
-      return res.status(500).json({ error: error.message || "Failed to fetch categories" });
+      console.error(error);
+      return res.status(500).json({ error });
     }
-
-    return res.json(Array.isArray(data) ? data : []);
+    return res.json(data || []);
   } catch (error) {
     console.error("[categories.list] unexpected error", error);
     return res.status(500).json({ error: "Server error" });

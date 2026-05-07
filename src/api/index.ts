@@ -1,7 +1,41 @@
-export const API_URL = "http://localhost:5001/api";
+import { API_BASE_URL } from "./config";
+
+export const API_URL = API_BASE_URL;
+const API_BASE = `${API_URL}/api`;
 export const TOKEN_KEY = "token";
-/** Dispatched on same tab whenever `setToken` runs (including logout). */
 export const AUTH_CHANGED_EVENT = "gold-water-auth-changed";
+
+type ApiRequestOptions = RequestInit & { headers?: Record<string, string>; requireAuth?: boolean };
+
+function isJsonResponse(response: Response) {
+  return response.headers.get("content-type")?.includes("application/json");
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (!isJsonResponse(response)) {
+    const text = await response.text();
+    return text || null;
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function resolveApiError(response: Response, payload: unknown): Error {
+  const errorFromPayload =
+    payload && typeof payload === "object" && payload !== null
+      ? "error" in payload && payload.error
+        ? String(payload.error)
+        : "message" in payload && payload.message
+          ? String(payload.message)
+          : ""
+      : "";
+  const fallback = response.statusText || `Request failed (${response.status})`;
+  return new Error(errorFromPayload || fallback);
+}
 
 export function getToken(): string | null {
   if (typeof localStorage === "undefined") return null;
@@ -26,66 +60,31 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
   return fallback;
 }
 
-async function request(path: string, options: RequestInit & { headers?: Record<string, string> } = {}) {
+async function request(path: string, options: ApiRequestOptions = {}) {
   const token = getToken();
+  if (options.requireAuth && !token) {
+    throw new Error("Authentication required. Please log in.");
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers || {})
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(`${API_BASE}${path}`, {
       ...options,
-      cache: "no-store",
       headers
     });
   } catch {
     throw new Error("Network error. Please check your connection.");
   }
 
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    const errMsg =
-      payload && typeof payload === "object" && payload !== null && "error" in payload
-        ? String((payload as { error?: string }).error)
-        : "Request failed";
-    throw new Error(errMsg || "Request failed");
-  }
-
+  const payload = await parseResponseBody(response);
+  if (!response.ok) throw resolveApiError(response, payload);
   return payload;
-}
-
-export async function loginApi(credentials: {
-  email?: string;
-  phone?: string;
-  password: string;
-}): Promise<{ token?: string; user?: unknown }> {
-  return request("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(credentials)
-  }) as Promise<{ token?: string; user?: unknown }>;
-}
-
-export async function registerApi(body: {
-  name: string;
-  email: string;
-  password: string;
-}): Promise<{ token?: string } & Record<string, unknown>> {
-  return request("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(body)
-  }) as Promise<{ token?: string } & Record<string, unknown>>;
 }
 
 export async function getProducts(params: Record<string, string | number | undefined> = {}) {
@@ -96,9 +95,7 @@ export async function getProducts(params: Record<string, string | number | undef
     }
   });
   const qs = search.toString();
-  const data = await request(`/products${qs ? `?${qs}` : ""}`);
-  console.log("API PRODUCTS:", data);
-  return data;
+  return request(`/products${qs ? `?${qs}` : ""}`);
 }
 
 export async function getProductByIdApi(productId: string) {
@@ -111,18 +108,16 @@ export async function getCategories() {
   return request("/categories");
 }
 
-export async function getBrands(categoryId: string) {
+export async function getBrands(categoryId?: string) {
   const normalizedCategoryId = String(categoryId || "").trim();
   if (!normalizedCategoryId) {
-    throw new Error("category_id is required to fetch brands");
+    return request("/brands");
   }
   return request(`/brands?category_id=${encodeURIComponent(normalizedCategoryId)}`);
 }
 
 export async function getSettings() {
-  const data = await request("/settings");
-  console.log("DATA SOURCE:", data);
-  return data;
+  return request("/settings");
 }
 
 export async function patchSettings(payload: {
@@ -140,9 +135,7 @@ export async function patchSettings(payload: {
 }
 
 export async function getPages() {
-  const data = await request("/pages");
-  console.log("DATA SOURCE:", data);
-  return data;
+  return request("/pages");
 }
 
 export async function patchPages(payload: {
@@ -164,50 +157,54 @@ export async function createProductApi(payload: {
   brand?: string;
   image_url?: string;
 }) {
-  const data = await request("/products", {
+  return request("/products", {
     method: "POST",
     body: JSON.stringify(payload)
   });
-  console.log("DATA SOURCE:", data);
-  return data;
 }
 
 export async function deleteProductApi(productId: string) {
-  const data = await request(`/products/${encodeURIComponent(productId)}`, {
+  return request(`/products/${encodeURIComponent(productId)}`, {
     method: "DELETE"
   });
-  console.log("DATA SOURCE:", data);
-  return data;
 }
 
 export async function addToCartApi(payload: { productId: string; quantity: number }) {
   return request("/cart", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    requireAuth: true
   });
 }
 
 export async function getCartApi() {
-  return request("/cart");
+  return request("/cart", { requireAuth: true });
 }
 
 export async function removeCartItemApi(productId: string) {
   return request(`/cart/product/${encodeURIComponent(productId)}`, {
-    method: "DELETE"
+    method: "DELETE",
+    requireAuth: true
   });
 }
 
 export async function clearCartApi() {
   return request("/cart/clear", {
-    method: "DELETE"
+    method: "DELETE",
+    requireAuth: true
   });
 }
 
 export async function createOrderApi(payload: Record<string, unknown> = {}) {
   return request("/orders", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    requireAuth: true
   });
+}
+
+export async function getOrdersApi() {
+  return request("/orders", { requireAuth: true });
 }
 
 export async function getAdminsApi() {
@@ -232,6 +229,71 @@ export async function deleteAdminApi(adminId: string) {
   });
 }
 
+export async function loginApi(payload: { email: string; password: string }) {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: payload.email,
+        password: payload.password
+      })
+    });
+  } catch {
+    throw new Error("Network error. Please check your connection.");
+  }
+
+  const body = await parseResponseBody(response);
+  if (!response.ok) throw resolveApiError(response, body);
+  return body;
+}
+
+export async function registerApi(payload: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string | null;
+}) {
+  return request("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getAuthMeApi() {
+  return request("/auth/me", { requireAuth: true });
+}
+
+export async function getProfileApi() {
+  return request("/user/profile", { requireAuth: true });
+}
+
+export async function updateProfileApi(body: Record<string, unknown>) {
+  const sanitized = buildProfilePatchPayload(body);
+  return request("/user/profile", {
+    method: "PATCH",
+    body: JSON.stringify(sanitized),
+    requireAuth: true
+  }) as Promise<Record<string, unknown>>;
+}
+
+export async function logoutApi() {
+  return request("/auth/logout", {
+    method: "POST",
+    requireAuth: true
+  });
+}
+
+export async function adminLoginApi(payload: { email: string; password: string }) {
+  return request("/admin/login", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 /** Whitelist PATCH body keys; map legacy display-name keys to `name` only (never sends snake-case alias). */
 function buildProfilePatchPayload(input: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -249,44 +311,10 @@ function buildProfilePatchPayload(input: Record<string, unknown>): Record<string
   return out;
 }
 
-/** PATCH /users/profile — authenticated; returns updated user JSON. */
+/** PATCH /user/profile — authenticated; returns updated user JSON. */
 export async function patchUserProfile(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const token = getToken();
-  if (!token) throw new Error("Not signed in");
-
-  const sanitized = buildProfilePatchPayload(body);
-  console.log("[patchUserProfile] outgoing payload", sanitized);
-
-  const res = await fetch(`${API_URL}/users/profile`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(sanitized)
-  });
-
-  const text = await res.text();
-  console.log("[patchUserProfile] response status", res.status, "body", text.slice(0, 800));
-
-  let parsed: unknown = null;
-  try {
-    parsed = text ? JSON.parse(text) : null;
-  } catch {
-    parsed = { error: text?.slice(0, 200) || "Invalid JSON response" };
-  }
-
-  if (!res.ok) {
-    const msg =
-      parsed && typeof parsed === "object" && parsed !== null && "error" in parsed
-        ? String((parsed as { error?: string }).error)
-        : `Request failed (${res.status})`;
-    throw new Error(msg || "Update failed");
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Invalid profile response");
-  }
-
-  return parsed as Record<string, unknown>;
+  return updateProfileApi(body);
 }
+
+export const getUserProfileApi = getProfileApi;
+export const getProductsApi = getProducts;

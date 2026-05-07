@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { AdminCategory, AdminProduct } from "../../types";
-import { getBrands } from "../../../api";
+import { API_URL, getBrands } from "../../../api";
 import ImageUploader from "./ImageUploader";
+import type { AdminCategory, AdminProduct } from "../../types";
 
 export type ProductEditorPayload = {
   name: string;
@@ -36,6 +36,8 @@ export default function ProductEditor({
   const [categoryId, setCategoryId] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
+  const [brandsLoading, setBrandsLoading] = useState(false);
+  const [brandsError, setBrandsError] = useState<string | null>(null);
   const [stock, setStock] = useState("");
   const [description, setDescription] = useState("");
 
@@ -69,8 +71,13 @@ export default function ProductEditor({
   useEffect(() => {
     let cancelled = false;
     async function loadBrands() {
+      setBrandsLoading(true);
+      setBrandsError(null);
       if (!categoryId) {
-        if (!cancelled) setBrands([]);
+        if (!cancelled) {
+          setBrands([]);
+          setBrandsLoading(false);
+        }
         return;
       }
       try {
@@ -82,7 +89,12 @@ export default function ProductEditor({
         }
       } catch (error) {
         console.error("[admin.productEditor] failed to load brands", error);
-        if (!cancelled) setBrands([]);
+        if (!cancelled) {
+          setBrands([]);
+          setBrandsError("Failed to load brands.");
+        }
+      } finally {
+        if (!cancelled) setBrandsLoading(false);
       }
     }
     loadBrands();
@@ -154,6 +166,8 @@ export default function ProductEditor({
             </option>
           ))}
         </select>
+        {brandsLoading ? <p className="mt-1 text-xs text-slate-500">Loading brands...</p> : null}
+        {brandsError ? <p className="mt-1 text-xs text-red-600">{brandsError}</p> : null}
       </div>
 
       <div>
@@ -234,9 +248,9 @@ export default function ProductEditor({
           disabled={false}
           maxSizeMb={2}
           remoteUpload={
-            import.meta.env.VITE_API_URL
+            API_URL
               ? {
-                  uploadUrl: `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/products/upload`,
+                  uploadUrl: `${API_URL.replace(/\/$/, "")}/api/products/upload`,
                   getToken: () => sessionStorage.getItem("dz_api_jwt")
                 }
               : undefined

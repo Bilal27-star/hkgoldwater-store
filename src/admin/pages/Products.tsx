@@ -25,7 +25,7 @@ type DrawerState = {
 };
 
 export default function Products() {
-  const { products, categories, deleteProduct, addCategory } = useAdminData();
+  const { products, productsLoading, productsError, categories, deleteProduct, addCategory } = useAdminData();
   const [filters, setFilters] = useState<ProductFiltersState>(defaultFilters);
   const [page, setPage] = useState(1);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -132,7 +132,15 @@ export default function Products() {
         onNewCategory={() => setCategoryModalOpen(true)}
       />
 
-      {hasNoProductsEver ? (
+      {productsLoading ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm">
+          <p className="font-medium text-slate-900">Loading products...</p>
+        </div>
+      ) : productsError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-14 text-center shadow-sm">
+          <p className="font-medium text-red-700">{productsError}</p>
+        </div>
+      ) : hasNoProductsEver ? (
         <ProductsEmptyState onAddProduct={openCreate} />
       ) : noMatches ? (
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm">

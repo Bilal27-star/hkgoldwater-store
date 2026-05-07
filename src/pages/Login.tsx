@@ -3,8 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import LoginPage from "../components/LoginPage";
 
 export default function Login() {
-  const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  const { isAuthenticated } = useAuth();
   if (isAuthenticated) return <Navigate to="/profile" replace />;
   return <LoginPage />;
 }

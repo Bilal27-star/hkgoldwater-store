@@ -7,9 +7,9 @@ export type FiltersSidebarProps = {
   categories: Array<{ id: string; name: string }>;
   selectedCategoryId: string | null;
   selectedBrand: string | null;
-  brands: string[];
+  brands: Array<{ id: string; name: string }>;
   onCategoryChange: (categoryId: string | null) => void;
-  onBrandChange: (brand: string | null) => void;
+  onBrandChange: (brandId: string | null) => void;
   onClearAll?: () => void;
 };
 
@@ -60,9 +60,10 @@ export default function FiltersSidebar({
                 <button
                   type="button"
                   className="w-full rounded-lg px-2 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-[#0B3D91]"
-                  onClick={() =>
-                    onCategoryChange(selectedCategoryId === category.id ? null : category.id)
-                  }
+                  onClick={() => {
+                    console.log("SELECTED CATEGORY:", category);
+                    onCategoryChange(selectedCategoryId === category.id ? null : category.id);
+                  }}
                 >
                   {category.name}
                 </button>
@@ -75,14 +76,14 @@ export default function FiltersSidebar({
           <h3 className="mb-3 text-sm font-medium text-gray-900">{t("filters.brand")}</h3>
           {brands.length ? (
             <ul className="space-y-1">
-              {brands.map((name) => (
-                <li key={name}>
+              {brands.map((brand) => (
+                <li key={brand.id}>
                   <button
                     type="button"
                     className="w-full rounded-lg px-2 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-[#0B3D91]"
-                    onClick={() => onBrandChange(selectedBrand === name ? null : name)}
+                    onClick={() => onBrandChange(selectedBrand === brand.id ? null : brand.id)}
                   >
-                    {name}
+                    {brand.name}
                   </button>
                 </li>
               ))}

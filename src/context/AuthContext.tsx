@@ -8,12 +8,14 @@ import {
   type ReactNode
 } from "react";
 import {
-  API_URL,
+  getProfileApi,
   getToken,
+  loginApi,
+  logoutApi,
   patchUserProfile,
   setToken as persistToken,
   AUTH_CHANGED_EVENT,
-  TOKEN_KEY
+  getErrorMessage
 } from "../api";
 
 export type AuthUser = {
@@ -28,8 +30,6 @@ export type AuthUser = {
   createdAt?: string | null;
 };
 
-type SessionState = { token: string | null; user: AuthUser | null };
-
 type PatchProfileBody = Partial<{
   name: string;
   phone: string | null;
@@ -41,9 +41,11 @@ type PatchProfileBody = Partial<{
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
+  session: null;
   loading: boolean;
+  error: string | null;
   isAuthenticated: boolean;
-  login: (token: string, user?: AuthUser | null) => void;
+  login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   logout: () => void;
   refreshSession: () => void;
   refreshProfile: () => Promise<void>;
@@ -78,25 +80,6 @@ function normalizeServerUser(data: Record<string, unknown>): AuthUser {
   };
 }
 
-function parseJwtPayload(token: string): Partial<AuthUser> | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(base64);
-    const payload = JSON.parse(json) as Record<string, unknown>;
-    const id = payload.sub ?? payload.id;
-    if (id === undefined || id === null) return null;
-    return {
-      id: String(id),
-      email: payload.email != null ? String(payload.email) : undefined,
-      role: payload.role != null ? String(payload.role) : undefined
-    };
-  } catch {
-    return null;
-  }
-}
-
 function readStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(AUTH_USER_KEY);
@@ -114,53 +97,52 @@ function writeStoredUser(user: AuthUser | null) {
   else localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 }
 
-function readSession(): SessionState {
-  if (typeof localStorage === "undefined") return { token: null, user: null };
-  const t = localStorage.getItem(TOKEN_KEY);
-  if (!t) return { token: null, user: null };
-
-  let nextUser = readStoredUser();
-  if (!nextUser) {
-    const fromJwt = parseJwtPayload(t);
-    if (fromJwt?.id) {
-      nextUser = {
-        id: fromJwt.id,
-        email: fromJwt.email ?? null,
-        role: fromJwt.role ?? null
-      };
-    }
-  }
-
-  return { token: t, user: nextUser };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<SessionState>(() => readSession());
-  const [loading] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(readStoredUser());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const token = getToken();
 
-  const { token, user } = session;
-
-  const refreshSession = useCallback(() => {
-    const t = getToken();
-    if (!t) {
-      setSession({ token: null, user: null });
+  const refreshSession = useCallback(async () => {
+    if (!getToken()) {
+      writeStoredUser(null);
+      setUser(null);
+      setError(null);
+      setLoading(false);
       return;
     }
-    const next = readSession();
-    setSession(next);
+
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = (await getProfileApi()) as Record<string, unknown>;
+      const row = profileResponseToFlatRecord(payload);
+      const nextUser = normalizeServerUser(row);
+      writeStoredUser(nextUser);
+      setUser(nextUser);
+    } catch (error) {
+      console.error("[AuthContext] failed to refresh session", error);
+      setError(getErrorMessage(error, "Failed to load profile"));
+      persistToken(null);
+      writeStoredUser(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    const t = getToken();
-    if (!t) return;
-    const res = await fetch(`${API_URL}/users/profile`, {
-      headers: { Authorization: `Bearer ${t}` }
-    });
-    if (!res.ok) return;
-    const raw = (await res.json()) as Record<string, unknown>;
-    const nextUser = normalizeServerUser(profileResponseToFlatRecord(raw));
-    writeStoredUser(nextUser);
-    setSession(readSession());
+    if (!getToken()) return;
+    try {
+      const raw = (await getProfileApi()) as Record<string, unknown>;
+      const nextUser = normalizeServerUser(profileResponseToFlatRecord(raw));
+      writeStoredUser(nextUser);
+      setUser(nextUser);
+      setError(null);
+    } catch (error) {
+      console.error("[AuthContext] failed to refresh profile", error);
+      setError(getErrorMessage(error, "Failed to load profile"));
+    }
   }, []);
 
   const patchProfile = useCallback(async (body: PatchProfileBody) => {
@@ -168,51 +150,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("[AuthContext patchProfile] normalized API user payload id:", payload.id);
     const nextUser = normalizeServerUser(profileResponseToFlatRecord(payload));
     writeStoredUser(nextUser);
-    setSession(readSession());
+    setUser(nextUser);
     return nextUser;
   }, []);
 
   useEffect(() => {
+    refreshSession().catch((error) => {
+      console.error("[AuthContext] initial refresh failed", error);
+    });
+
     function onAuthChanged() {
-      refreshSession();
+      refreshSession().catch((error) => {
+        console.error("[AuthContext] refreshSession failed", error);
+      });
     }
     window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
-    return () => window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    };
   }, [refreshSession]);
 
-  const login = useCallback((newToken: string, nextUser?: AuthUser | null) => {
-    if (nextUser?.id) {
-      writeStoredUser(
-        normalizeServerUser({
-          id: nextUser.id,
-          name: nextUser.name,
-          email: nextUser.email,
-          phone: nextUser.phone,
-          role: nextUser.role,
-          wilaya: nextUser.wilaya,
-          commune: nextUser.commune,
-          address: nextUser.address,
-          createdAt: nextUser.createdAt
-        })
-      );
+  const login = useCallback(async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = (await loginApi({
+        email: email.trim().toLowerCase(),
+        password
+      })) as { token?: string; user?: Record<string, unknown> };
+      if (!payload?.token) {
+        return { ok: false as const, error: "Login failed: missing token." };
+      }
+      persistToken(payload.token);
+      if (payload.user && typeof payload.user === "object") {
+        const nextUser = normalizeServerUser(payload.user);
+        writeStoredUser(nextUser);
+        setUser(nextUser);
+      }
+      return { ok: true as const };
+    } catch (error) {
+      const message = getErrorMessage(error, "Login failed");
+      setError(message);
+      return { ok: false as const, error: message };
+    } finally {
+      setLoading(false);
     }
-    persistToken(newToken);
-    setSession(readSession());
   }, []);
 
   const logout = useCallback(() => {
+    logoutApi().catch((error) => {
+      console.error("[AuthContext] logout API failed", error);
+    });
     persistToken(null);
     writeStoredUser(null);
-    setSession({ token: null, user: null });
+    setUser(null);
+    setError(null);
   }, []);
 
-  const isAuthenticated = !!token;
+  const isAuthenticated = !!user;
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
+      session: null,
       loading,
+      error,
       isAuthenticated,
       login,
       logout,
@@ -220,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       patchProfile
     }),
-    [user, token, loading, isAuthenticated, login, logout, refreshSession, refreshProfile, patchProfile]
+    [user, token, loading, error, isAuthenticated, login, logout, refreshSession, refreshProfile, patchProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

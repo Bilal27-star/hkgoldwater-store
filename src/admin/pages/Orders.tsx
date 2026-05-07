@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DollarSign, Loader2, Package, Search, TrendingUp } from "lucide-react";
-import { API_URL, getToken } from "../../api";
+import { getOrdersApi } from "../../api";
 import OrderDetailsModal from "../components/orders/OrderDetailsModal";
 import StatsCard from "../components/orders/StatsCard";
 import OrdersTable from "../components/orders/OrdersTable";
@@ -130,6 +130,7 @@ function filterRows(rows: OrderCustomerRow[], query: string): OrderCustomerRow[]
 export default function Orders() {
   const [orders, setOrders] = useState<OrderCustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderCustomerRow | null>(null);
@@ -138,27 +139,9 @@ export default function Orders() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const token = getToken();
+      setError(null);
       try {
-        const res = await fetch(`${API_URL}/orders`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          }
-        });
-        const text = await res.text();
-        let data: unknown = null;
-        try {
-          data = text ? JSON.parse(text) : null;
-        } catch {
-          data = null;
-        }
-        if (!res.ok) {
-          const msg =
-            data && typeof data === "object" && data !== null && "error" in data
-              ? String((data as { error?: string }).error ?? res.statusText)
-              : res.statusText;
-          throw new Error(msg || "Failed to load orders");
-        }
+        const data = (await getOrdersApi()) as unknown;
         const list = Array.isArray(data) ? data : [];
         if (!cancelled) {
           setOrders(list.map((row) => mapApiOrderToRow(row as ApiOrder)));
@@ -167,6 +150,7 @@ export default function Orders() {
         if (!cancelled) {
           console.error(e);
           setOrders([]);
+          setError("Failed to load orders.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -251,6 +235,10 @@ export default function Orders() {
       {loading ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <p className="p-8 text-center text-sm text-slate-500">Loading orders…</p>
+        </div>
+      ) : error ? (
+        <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50 shadow-sm">
+          <p className="p-8 text-center text-sm text-red-700">{error}</p>
         </div>
       ) : (
         <OrdersTable rows={filtered} onView={handleView} totalBeforeFilter={orders.length} />

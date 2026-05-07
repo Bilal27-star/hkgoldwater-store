@@ -10,6 +10,7 @@ import HomePage from "./components/HomePage";
 import ProductListingPage from "./components/ProductListingPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import { Login, Signup, Profile } from "./routes";
+import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminLoginPage from "./admin/AdminLoginPage";
 import AdminLayout from "./admin/AdminLayout";
 import PrivateRoute from "./admin/PrivateRoute";
@@ -52,18 +53,20 @@ export default function App() {
           <Routes>
             <Route path="/admin/login" element={<AdminLoginPage />} />
 
-            <Route path="/admin" element={<PrivateRoute />}>
-              <Route element={<AdminLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="admins" element={<AdminManagement />} />
-                <Route path="products" element={<Products />} />
-                <Route path="products/new" element={<ProductForm />} />
-                <Route path="products/:id/edit" element={<ProductForm />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="pages-content" element={<PagesContent />} />
-                <Route path="social-media" element={<SocialMediaManagement />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="*" element={<AdminCatchAll />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/admin" element={<PrivateRoute />}>
+                <Route element={<AdminLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="admins" element={<AdminManagement />} />
+                  <Route path="products" element={<Products />} />
+                  <Route path="products/new" element={<ProductForm />} />
+                  <Route path="products/:id/edit" element={<ProductForm />} />
+                  <Route path="orders" element={<Orders />} />
+                  <Route path="pages-content" element={<PagesContent />} />
+                  <Route path="social-media" element={<SocialMediaManagement />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="*" element={<AdminCatchAll />} />
+                </Route>
               </Route>
             </Route>
 
@@ -76,7 +79,9 @@ export default function App() {
               <Route path="/product/:id" element={<ProductDetailPage />} />
               <Route path="/products/:id" element={<ProductDetailPage />} />
               <Route path="/contact" element={<ContactPage />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/profile" element={<Profile />} />
+              </Route>
               <Route path="/cart" element={<CartPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/order-success" element={<OrderSuccess />} />

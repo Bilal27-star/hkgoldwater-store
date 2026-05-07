@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { getErrorMessage, loginApi } from "../../api";
+import { adminLoginApi, getErrorMessage, setToken } from "../../api";
 import { ADMIN_SESSION_STORAGE_KEY } from "../constants";
 import type { AdminUser } from "../types";
 
@@ -48,19 +48,26 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const payload = {
-        email: email.trim().toLowerCase(),
+      const normalizedEmail = email.trim().toLowerCase();
+      const payload = (await adminLoginApi({
+        email: normalizedEmail,
         password
+      })) as {
+        token?: string;
+        user?: { email?: string; name?: string; role?: string };
       };
-      const data = await loginApi(payload);
-      const user = data && typeof data === "object" && "user" in data ? (data as any).user : null;
-      if (!user || (user.role !== "admin" && user.role !== "main_admin" && user.role !== "superadmin")) {
+      if (!payload?.token || !payload?.user) {
+        return { ok: false as const, error: "Invalid admin login response." };
+      }
+      setToken(payload.token);
+      const role = String(payload.user.role || "admin");
+      if (role !== "admin" && role !== "main_admin" && role !== "superadmin") {
         return { ok: false as const, error: "Admin access required." };
       }
       const next: AdminUser = {
-        email: String(user.email || payload.email),
-        name: String(user.name || "Admin"),
-        role: user.role
+        email: String(payload.user.email || normalizedEmail),
+        name: String(payload.user.name || "Admin"),
+        role
       };
       writeSession(next);
       setUser(next);
@@ -72,6 +79,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     writeSession(null);
+    setToken(null);
     setUser(null);
   }, []);
 

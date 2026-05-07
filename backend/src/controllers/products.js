@@ -100,12 +100,11 @@ export async function listProducts(req, res) {
     const supabase = req.app.locals.supabase;
     const result = await supabase
       .from("products")
-      .select("*, category:categories(id,name), brand_relation:brands(id,name,category_id)")
+      .select("*")
       .order("created_at", { ascending: false });
     if (result.error) throw result.error;
     console.log("DB RESPONSE:", result.data);
-    const products = Array.isArray(result.data) ? result.data.map(mapRowToApiProduct) : [];
-    console.log("DB PRODUCTS:", products);
+    const products = Array.isArray(result.data) ? result.data : [];
     console.log("Fetched products:", products);
     res.json(products);
   } catch (err) {

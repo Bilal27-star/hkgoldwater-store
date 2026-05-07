@@ -5,7 +5,8 @@ import FiltersSidebar from "./FiltersSidebar";
 import ProductCard, { type ProductItem } from "./ProductCard";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
-import { getBrands, getCategories, getProducts } from "../api";
+import { getCategories, getProducts } from "../api";
+import { API_BASE_URL } from "../api/config";
 
 const PRICE_RANGE_DEFAULT: [number, number] = [0, 50000];
 
@@ -20,21 +21,37 @@ function resolveLocalizedText(value: unknown, lang: "fr" | "en" | "ar") {
 export default function ProductListingPage() {
   const { t, language } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedCategoryId = searchParams.get("categoryId")?.trim() || null;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const selectedBrand = searchParams.get("brand")?.trim() || null;
   const searchTerm = searchParams.get("search")?.trim() || "";
   const [priceRange, setPriceRange] = useState<[number, number]>(PRICE_RANGE_DEFAULT);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [brands, setBrands] = useState<string[]>([]);
+  const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [brandsLoading, setBrandsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [brandsError, setBrandsError] = useState<string | null>(null);
   const renderCountRef = useRef(0);
 
   renderCountRef.current += 1;
   console.log("[ProductListingPage] render count", renderCountRef.current, "products", products.length);
+  console.log("selectedCategoryId:", selectedCategoryId);
+
+  useEffect(() => {
+    const queryCategoryId = searchParams.get("categoryId")?.trim() || null;
+    if (queryCategoryId !== selectedCategoryId) {
+      setSelectedCategoryId(queryCategoryId);
+    }
+  }, [searchParams, selectedCategoryId]);
 
   useEffect(() => {
     let cancelled = false;
     async function loadProducts() {
+      setProductsLoading(true);
+      setProductsError(null);
       try {
         const data = await getProducts();
         console.log("API PRODUCTS:", data);
@@ -59,7 +76,7 @@ export default function ProductListingPage() {
             const price = Number.isFinite(priceNum) ? priceNum : 0;
             return {
               id,
-              brand: item.brand || "",
+              brand: String(item.brand_id || ""),
               title:
                 resolveLocalizedText(item.name || item.title, language) ||
                 "Unnamed product",
@@ -74,7 +91,12 @@ export default function ProductListingPage() {
         if (!cancelled) setProducts(mapped);
       } catch (error) {
         console.error("[ProductListingPage] fetch error", error);
-        if (!cancelled) setProducts([]);
+        if (!cancelled) {
+          setProducts([]);
+          setProductsError("Failed to load products.");
+        }
+      } finally {
+        if (!cancelled) setProductsLoading(false);
       }
     }
     loadProducts();
@@ -86,8 +108,11 @@ export default function ProductListingPage() {
   useEffect(() => {
     let cancelled = false;
     async function loadCategories() {
+      setCategoriesLoading(true);
+      setCategoriesError(null);
       try {
         const data = await getCategories();
+        console.log("CATEGORIES:", data);
         const rows = Array.isArray(data) ? data : [];
         if (!cancelled) {
           setCategories(
@@ -96,7 +121,12 @@ export default function ProductListingPage() {
         }
       } catch (error) {
         console.error("[ProductListingPage] categories fetch error", error);
-        if (!cancelled) setCategories([]);
+        if (!cancelled) {
+          setCategories([]);
+          setCategoriesError("Failed to load categories.");
+        }
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
       }
     }
     loadCategories();
@@ -108,42 +138,39 @@ export default function ProductListingPage() {
   useEffect(() => {
     let cancelled = false;
     async function loadBrands() {
+      setBrandsLoading(true);
+      setBrandsError(null);
       try {
-        // If a category is selected, fetch only that category's brands.
         if (selectedCategoryId) {
-          const data = await getBrands(selectedCategoryId);
-          console.log("[ProductListingPage] fetched brands for category_id:", selectedCategoryId, data);
-          const rows = Array.isArray(data) ? data : [];
-          const unique = Array.from(
-            new Set(rows.map((row: any) => String(row.name || "").trim()).filter(Boolean))
+          console.log("FETCHING BRANDS FOR:", selectedCategoryId);
+          const response = await fetch(
+            `${API_BASE_URL}/api/brands?category_id=${selectedCategoryId}`
           );
-          if (!cancelled) setBrands(unique);
-          return;
-        }
-
-        // No category selected: fetch all brands by querying each category and flattening.
-        if (!categories.length) {
+          const data = await response.json();
+          console.log("BRANDS:", data);
+          const rows = Array.isArray(data) ? data : [];
+          const mapped = rows
+            .map((row: any) => ({ id: String(row.id || ""), name: String(row.name || "").trim() }))
+            .filter((row) => row.id && row.name);
+          if (!cancelled) setBrands(mapped);
+        } else {
           if (!cancelled) setBrands([]);
-          return;
         }
-
-        const allResponses = await Promise.all(categories.map((category) => getBrands(category.id)));
-        const merged = allResponses.flatMap((data) => (Array.isArray(data) ? data : []));
-        console.log("[ProductListingPage] fetched brands (all categories):", merged);
-        const unique = Array.from(
-          new Set(merged.map((row: any) => String(row.name || "").trim()).filter(Boolean))
-        );
-        if (!cancelled) setBrands(unique);
       } catch (error) {
         console.error("[ProductListingPage] brands fetch error", error);
-        if (!cancelled) setBrands([]);
+        if (!cancelled) {
+          setBrands([]);
+          setBrandsError("Failed to load brands.");
+        }
+      } finally {
+        if (!cancelled) setBrandsLoading(false);
       }
     }
     loadBrands();
     return () => {
       cancelled = true;
     };
-  }, [selectedCategoryId, categories]);
+  }, [selectedCategoryId]);
 
   function updateQuery(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams);
@@ -205,10 +232,15 @@ export default function ProductListingPage() {
                 selectedBrand={selectedBrand}
                 brands={brands}
                 onCategoryChange={(categoryId: string | null) =>
-                  updateQuery({
-                    categoryId,
-                    brand: null
-                  })
+                  {
+                    const clickedCategory = categories.find((cat) => cat.id === categoryId) || null;
+                    console.log("CLICKED CATEGORY:", clickedCategory);
+                    setSelectedCategoryId(categoryId);
+                    updateQuery({
+                      categoryId,
+                      brand: null
+                    });
+                  }
                 }
                 onBrandChange={(brand: string | null) => updateQuery({ brand })}
                 onClearAll={() => {
@@ -238,6 +270,12 @@ export default function ProductListingPage() {
                 </select>
               </label>
             </div>
+            {productsLoading ? <p className="mb-4 text-sm text-gray-600">Loading products...</p> : null}
+            {productsError ? <p className="mb-4 text-sm text-red-600">{productsError}</p> : null}
+            {categoriesLoading ? <p className="mb-4 text-xs text-gray-500">Loading categories...</p> : null}
+            {categoriesError ? <p className="mb-4 text-xs text-red-600">{categoriesError}</p> : null}
+            {brandsLoading ? <p className="mb-4 text-xs text-gray-500">Loading brands...</p> : null}
+            {brandsError ? <p className="mb-4 text-xs text-red-600">{brandsError}</p> : null}
 
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product) => (
