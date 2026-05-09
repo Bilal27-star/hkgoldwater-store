@@ -59,22 +59,22 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitError("");
-    if (loginType !== "email") {
-      setSubmitError("Please choose Email to sign in.");
-      return;
-    }
     setSubmitting(true);
     try {
-      console.log("LOGIN REQUEST:", {
-        url: `${API_BASE_URL}/api/auth/login`,
-        email: email.trim()
-      });
+      const input = loginType === "email" ? email.trim() : phone.trim();
+      const payload = {
+        input,
+        email: loginType === "email" ? email.trim() : null,
+        phone: loginType === "phone" ? phone.trim() : null,
+        password
+      };
+      console.log("LOGIN REQUEST:", payload);
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password })
+        body: JSON.stringify(payload)
       });
-      const data = (await response.json()) as { token?: string; message?: string; user?: unknown };
+      const data = (await response.json()) as { token?: string; message?: string; error?: string; user?: unknown };
       console.log("LOGIN RESPONSE:", response.status, data);
       if (response.ok && data.token) {
         setToken(data.token);
@@ -82,7 +82,7 @@ export default function LoginPage() {
           localStorage.setItem("gold_water_auth_user", JSON.stringify(data.user));
         }
       } else {
-        setSubmitError(data.message || "Login failed");
+        setSubmitError(data.message || data.error || "Login failed");
         return;
       }
       navigate("/", { replace: true });

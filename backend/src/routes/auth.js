@@ -25,102 +25,106 @@ function signUserToken(user) {
 }
 
 router.post("/register", async (req, res) => {
-  console.log("REGISTER ROUTE HIT:", import.meta.url);
-  console.log("REGISTER BODY:", req.body);
-  console.log("REQ BODY:", req.body);
-  const { name, email, phone, password } = req.body;
-  const normalizedName = asText(name);
-  const normalizedEmail = asText(email).toLowerCase();
-  const normalizedPhone = asText(phone);
-  const normalizedPassword = asText(password);
+  const name = asText(req.body?.name);
+  const email = asText(req.body?.email).toLowerCase() || null;
+  const phone = asText(req.body?.phone) || null;
+  const password = asText(req.body?.password);
 
-  if (!normalizedName || !normalizedPassword || (!normalizedEmail && !normalizedPhone)) {
-    return res.status(400).json({ error: "name and password and (email or phone) are required" });
-  }
-  if (normalizedPassword.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  if (!name || !password || (!email && !phone)) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    console.log("REGISTER REQUEST:", {
-      email: normalizedEmail,
-      phone: normalizedPhone
-    });
     const supabase = req.app.locals.supabase;
-    let existingQuery = supabase.from("users").select("id");
-    existingQuery = normalizedEmail
-      ? existingQuery.eq("email", normalizedEmail)
-      : existingQuery.eq("phone", normalizedPhone);
-    const existing = await existingQuery.maybeSingle();
-    if (existing.error) throw existing.error;
-    if (existing.data) {
-      return res.status(409).json({
-        error: normalizedEmail
-          ? "An account with this email already exists"
-          : "An account with this phone already exists"
-      });
+
+    if (email) {
+      const { data: emailExists, error: emailCheckError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+      if (emailCheckError) {
+        console.error("REGISTER ERROR:", emailCheckError);
+        return res.status(500).json({ error: emailCheckError.message });
+      }
+      if (emailExists) {
+        return res.status(409).json({ error: "An account with this email already exists" });
+      }
     }
 
-    const passwordHash = await bcrypt.hash(normalizedPassword, 10);
+    if (phone) {
+      const { data: phoneExists, error: phoneCheckError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("phone", phone)
+        .maybeSingle();
+      if (phoneCheckError) {
+        console.error("REGISTER ERROR:", phoneCheckError);
+        return res.status(500).json({ error: phoneCheckError.message });
+      }
+      if (phoneExists) {
+        return res.status(409).json({ error: "An account with this phone already exists" });
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    console.log("REGISTER INPUT:", { name, email, phone });
+
     const { data, error } = await supabase
       .from("users")
-      .insert({
-        name: normalizedName,
-        email: normalizedEmail || null,
-        phone: normalizedPhone || null,
-        password_hash: passwordHash,
-        role: "customer"
-      })
-      .select("id,name,email,role,phone,wilaya,commune,address,created_at")
+      .insert([
+        {
+          name,
+          email: email || null,
+          phone: phone || null,
+          password_hash: passwordHash,
+          role: "customer"
+        }
+      ])
+      .select()
       .single();
-    if (error) throw error;
-    console.log("REGISTER SUCCESS:", data?.id);
+
+    if (error) {
+      console.error("REGISTER ERROR FULL:", error);
+      return res.status(500).json({ error: error.message });
+    }
+    console.log("REGISTER SUCCESS:", data);
 
     return res.status(201).json({
       success: true,
-      user: {
-        id: data.id,
-        name: data.name ?? null,
-        email: data.email,
-        role: data.role ?? "customer",
-        phone: data.phone ?? null,
-        wilaya: data.wilaya ?? null,
-        commune: data.commune ?? null,
-        address: data.address ?? null,
-        createdAt: data.created_at ?? null
-      }
+      user: data
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Registration failed";
-    return res.status(500).json({ error: message });
+    console.error("REGISTER ERROR FULL:", error);
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Registration failed" });
   }
 });
 
 router.post("/login", async (req, res) => {
   const rawInput = asText(req.body?.email || req.body?.phone || req.body?.input);
   const isEmailInput = rawInput.includes("@");
-  const loginInput = isEmailInput ? rawInput.toLowerCase() : rawInput;
+  const normalizedPhone = rawInput.replace(/\s/g, "");
+  const parsedInput = isEmailInput ? rawInput.toLowerCase() : normalizedPhone;
   const password = asText(req.body?.password);
-  console.log("LOGIN INPUT:", loginInput, password);
-  if (!loginInput || !password) return res.status(400).json({ error: "email/phone and password are required" });
+  console.log("LOGIN INPUT:", req.body);
+  console.log("PARSED INPUT:", parsedInput);
+  if (!parsedInput || !password) return res.status(400).json({ message: "Invalid credentials" });
 
   try {
     const supabase = req.app.locals.supabase;
     let query = supabase
       .from("users")
       .select("*");
-    query = isEmailInput ? query.eq("email", loginInput) : query.eq("phone", loginInput);
+    query = isEmailInput ? query.eq("email", parsedInput) : query.eq("phone", normalizedPhone);
     const { data: user, error } = await query.maybeSingle();
     console.log("DB USER:", user);
     console.log("ERROR:", error);
     if (error) throw error;
-    if (!user) return res.status(401).json({ message: "User not found" });
-    console.log("HASH:", user.password_hash);
-    console.log("INPUT:", password);
-    if (!user.password_hash) return res.status(401).json({ message: "Wrong password" });
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
+    if (!user.password_hash) return res.status(401).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return res.status(401).json({ message: "Wrong password" });
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
     const token = signUserToken(user);
     return res.json({

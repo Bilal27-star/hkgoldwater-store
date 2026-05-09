@@ -49,9 +49,9 @@ export function getOrdersApi(): Promise<any>;
 export function loginApi(payload: { email: string; password: string }): Promise<any>;
 export function registerApi(payload: {
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
-  phone?: string | null;
 }): Promise<any>;
 export function getAuthMeApi(): Promise<any>;
 export function getProfileApi(): Promise<any>;

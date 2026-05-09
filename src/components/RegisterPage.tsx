@@ -38,11 +38,8 @@ export default function RegisterPage() {
 
   const isFormValid =
     !!fullName.trim() &&
-    !(
-      (mode === "email" && !email.trim()) ||
-      (mode === "phone" && !phone.trim()) ||
-      !password
-    );
+    !!password &&
+    (!!email.trim() || !!phone.trim());
 
   function validate(): boolean {
     const next: Record<string, string> = {};
@@ -72,13 +69,8 @@ export default function RegisterPage() {
     if (!validate()) return;
     setSubmitError("");
     setSubmitSuccess("");
-    if (
-      !fullName.trim() ||
-      (mode === "email" && !email.trim()) ||
-      (mode === "phone" && !phone.trim()) ||
-      !password
-    ) {
-      setSubmitError("Please fill all required fields.");
+    if (!fullName.trim() || !password || (!email.trim() && !phone.trim())) {
+      setSubmitError("Email or phone is required.");
       return;
     }
     setSubmitting(true);
@@ -91,7 +83,7 @@ export default function RegisterPage() {
         password
       };
       console.log("REGISTER PAYLOAD:", payload);
-      await registerApi(payload);
+      await registerApi(payload as { name: string; email: string; password: string; phone?: string });
       setSubmitSuccess("Account created successfully. You can now log in.");
       navigate("/login", { replace: true });
     } catch (err) {
