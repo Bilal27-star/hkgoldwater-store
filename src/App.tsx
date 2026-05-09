@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { useEffect } from "react";
 import CartPage from "./components/CartPage";
 import CheckoutPage from "./components/CheckoutPage";
 import ImprovedHeader from "./components/ImprovedHeader";
@@ -24,6 +25,7 @@ import PagesContent from "./admin/pages/PagesContent";
 import SocialMediaManagement from "./admin/pages/SocialMediaManagement";
 import { AdminAuthProvider } from "./admin/context/AdminAuthContext";
 import { AdminDataProvider } from "./admin/context/AdminDataContext";
+import { API_BASE_URL } from "./api/config";
 
 function AdminCatchAll() {
   return <Navigate to="/admin" replace />;
@@ -39,6 +41,40 @@ function Layout() {
 }
 
 export default function App() {
+  const isAuthenticated = !!localStorage.getItem("token");
+  console.log("isAuthenticated:", isAuthenticated);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    console.log("TOKEN FOUND:", !!token);
+    if (!token) return;
+
+    (async () => {
+      try {
+        console.log("PROFILE FETCH:", `${API_BASE_URL}/api/users/profile`);
+        const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const payload = await response.json().catch(() => null);
+        console.log("PROFILE FETCH:", response.status, payload);
+        if (!response.ok) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("gold_water_auth_user");
+          return;
+        }
+        if (payload && typeof payload === "object") {
+          localStorage.setItem("gold_water_auth_user", JSON.stringify(payload));
+        }
+      } catch (error) {
+        console.error("PROFILE FETCH:", error);
+        localStorage.removeItem("token");
+        localStorage.removeItem("gold_water_auth_user");
+      }
+    })();
+  }, []);
+
   return (
     <BrowserRouter>
       <AdminAuthProvider>

@@ -7,14 +7,14 @@ import {
   User,
   UserPlus
 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BrandLogo from "./BrandLogo";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
 import { getErrorMessage, registerApi } from "../api";
 
-type LoginType = "phone" | "email";
+type RegisterMode = "phone" | "email";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
-  const [loginType, setLoginType] = useState<LoginType>("phone");
+  const [mode, setMode] = useState<RegisterMode>("email");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -36,25 +36,20 @@ export default function RegisterPage() {
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const isFormValid = useMemo(() => {
-    if (!fullName.trim()) return false;
-    if (loginType === "email") {
-      const v = email.trim();
-      if (!v || !emailRegex.test(v)) return false;
-    } else {
-      const digits = phone.replace(/\D/g, "");
-      if (!phone.trim() || digits.length < 8) return false;
-    }
-    if (!password || password.length < 8) return false;
-    return true;
-  }, [fullName, loginType, email, phone, password]);
+  const isFormValid =
+    !!fullName.trim() &&
+    !(
+      (mode === "email" && !email.trim()) ||
+      (mode === "phone" && !phone.trim()) ||
+      !password
+    );
 
   function validate(): boolean {
     const next: Record<string, string> = {};
 
     if (!fullName.trim()) next.fullName = t("validation.fullNameRequired");
 
-    if (loginType === "email") {
+    if (mode === "email") {
       const v = email.trim();
       if (!v) next.email = t("validation.emailRequired");
       else if (!emailRegex.test(v)) next.email = t("validation.emailInvalid");
@@ -77,18 +72,26 @@ export default function RegisterPage() {
     if (!validate()) return;
     setSubmitError("");
     setSubmitSuccess("");
-    if (loginType !== "email") {
-      setSubmitError("Please choose Email — registration requires an email address.");
+    if (
+      !fullName.trim() ||
+      (mode === "email" && !email.trim()) ||
+      (mode === "phone" && !phone.trim()) ||
+      !password
+    ) {
+      setSubmitError("Please fill all required fields.");
       return;
     }
     setSubmitting(true);
     try {
-      await registerApi({
-        name: fullName.trim(),
-        email: email.trim(),
-        password,
-        phone: loginType === "phone" ? phone.trim() : null
-      });
+      const name = fullName.trim();
+      const payload = {
+        name,
+        ...(email.trim() ? { email: email.trim() } : {}),
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+        password
+      };
+      console.log("REGISTER PAYLOAD:", payload);
+      await registerApi(payload);
       setSubmitSuccess("Account created successfully. You can now log in.");
       navigate("/login", { replace: true });
     } catch (err) {
@@ -152,7 +155,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginType("phone");
+                    setMode("phone");
                     setErrors((prev) => {
                       const next = { ...prev };
                       delete next.email;
@@ -160,7 +163,7 @@ export default function RegisterPage() {
                     });
                   }}
                   className={`flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition duration-200 ${
-                    loginType === "phone"
+                    mode === "phone"
                       ? "border-[#1565C0] bg-blue-50 text-[#0B3D91] shadow-sm"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                   }`}
@@ -171,7 +174,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginType("email");
+                    setMode("email");
                     setErrors((prev) => {
                       const next = { ...prev };
                       delete next.phone;
@@ -179,7 +182,7 @@ export default function RegisterPage() {
                     });
                   }}
                   className={`flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition duration-200 ${
-                    loginType === "email"
+                    mode === "email"
                       ? "border-[#1565C0] bg-blue-50 text-[#0B3D91] shadow-sm"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                   }`}
@@ -191,10 +194,10 @@ export default function RegisterPage() {
             </div>
 
             <div
-              key={loginType}
+              key={mode}
               className="space-y-4 transition-opacity duration-200"
             >
-              {loginType === "phone" ? (
+              {mode === "phone" ? (
                 <div>
                   <label className="sr-only" htmlFor="register-phone">
                     {t("auth.phoneNumber")}

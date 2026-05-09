@@ -253,9 +253,9 @@ export async function loginApi(payload: { email: string; password: string }) {
 
 export async function registerApi(payload: {
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
-  phone?: string | null;
 }) {
   return request("/auth/register", {
     method: "POST",
