@@ -75,7 +75,7 @@ export default function ProductDetailPage() {
           ? normalizedImages
           : mainImage
             ? [mainImage]
-            : ["/logos/logo-light.svg"];
+            : ["/logo.png"];
         const galleryImages =
           images.length === 1
             ? [images[0], images[0], images[0], images[0]]

@@ -10,6 +10,7 @@ import {
 import {
   getProfileApi,
   getToken,
+  isAdminJwtToken,
   loginApi,
   logoutApi,
   patchUserProfile,
@@ -104,8 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const token = getToken();
 
   const refreshSession = useCallback(async () => {
-    if (!getToken()) {
+    const t = getToken();
+    if (!t) {
       writeStoredUser(null);
+      setUser(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    if (isAdminJwtToken(t)) {
       setUser(null);
       setError(null);
       setLoading(false);
@@ -123,7 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("[AuthContext] failed to refresh session", error);
       setError(getErrorMessage(error, "Failed to load profile"));
-      persistToken(null);
       writeStoredUser(null);
       setUser(null);
     } finally {

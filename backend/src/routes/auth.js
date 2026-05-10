@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import auth from "../middleware/auth.js";
+import { authDebug } from "../utils/authDebug.js";
 
 const router = Router();
 
@@ -106,9 +107,16 @@ router.post("/login", async (req, res) => {
   const normalizedPhone = rawInput.replace(/\s/g, "");
   const parsedInput = isEmailInput ? rawInput.toLowerCase() : normalizedPhone;
   const password = asText(req.body?.password);
-  console.log("LOGIN INPUT:", req.body);
-  console.log("PARSED INPUT:", parsedInput);
-  if (!parsedInput || !password) return res.status(400).json({ message: "Invalid credentials" });
+  authDebug("auth-login.request", {
+    isEmailInput,
+    parsedInput,
+    passwordLength: password.length
+  });
+  if (!parsedInput || !password) {
+    const body = { message: "Invalid credentials" };
+    authDebug("auth-login.response", { status: 400, body });
+    return res.status(400).json(body);
+  }
 
   try {
     const supabase = req.app.locals.supabase;
@@ -117,17 +125,59 @@ router.post("/login", async (req, res) => {
       .select("*");
     query = isEmailInput ? query.eq("email", parsedInput) : query.eq("phone", normalizedPhone);
     const { data: user, error } = await query.maybeSingle();
-    console.log("DB USER:", user);
-    console.log("ERROR:", error);
     if (error) throw error;
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
-    if (!user.password_hash) return res.status(401).json({ message: "Invalid credentials" });
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    authDebug("auth-login.lookup", {
+      parsedInput,
+      userFound: !!user,
+      userId: user?.id ?? null,
+      hasPasswordHash: Boolean(user?.password_hash),
+      storedPasswordHash: user?.password_hash ?? null,
+      dbRole: user?.role ?? null
+    });
+
+    if (!user) {
+      const body = { message: "Invalid credentials" };
+      authDebug("auth-login.response", { status: 401, body, reason: "user_not_found" });
+      return res.status(401).json(body);
+    }
+    if (!user.password_hash) {
+      const body = { message: "Invalid credentials" };
+      authDebug("auth-login.response", { status: 401, body, reason: "missing_password_hash" });
+      return res.status(401).json(body);
+    }
+
+    let isMatch = false;
+    let compareError = null;
+    try {
+      isMatch = await bcrypt.compare(password, user.password_hash);
+    } catch (e) {
+      compareError = e instanceof Error ? e.message : String(e);
+      isMatch = false;
+    }
+    authDebug("auth-login.bcrypt", {
+      bcryptCompareResult: isMatch,
+      compareThrew: compareError != null,
+      compareError
+    });
+
+    if (!isMatch) {
+      const body = { message: "Invalid credentials" };
+      authDebug("auth-login.response", { status: 401, body, reason: "password_mismatch" });
+      return res.status(401).json(body);
+    }
+
+    const jwtPayload = {
+      id: user.id,
+      email: user.email,
+      role: user.role || "customer"
+    };
+    authDebug("auth-login.jwt", { payload: jwtPayload });
 
     const token = signUserToken(user);
-    return res.json({
+    authDebug("auth-login.jwt", { token });
+
+    const responseBody = {
       token,
       user: {
         id: user.id,
@@ -140,10 +190,15 @@ router.post("/login", async (req, res) => {
         address: user.address ?? null,
         createdAt: user.created_at ?? null
       }
-    });
+    };
+    authDebug("auth-login.response", { status: 200, body: responseBody });
+
+    return res.json(responseBody);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Login failed";
-    return res.status(500).json({ error: message });
+    const body = { error: message };
+    authDebug("auth-login.response", { status: 500, body });
+    return res.status(500).json(body);
   }
 });
 

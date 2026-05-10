@@ -5,7 +5,7 @@ import FiltersSidebar from "./FiltersSidebar";
 import ProductCard, { type ProductItem } from "./ProductCard";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
-import { getCategories, getProducts } from "../api";
+import { getAuthHeaders, getCategories, getProducts } from "../api";
 import { API_BASE_URL } from "../api/config";
 
 const PRICE_RANGE_DEFAULT: [number, number] = [0, 50000];
@@ -144,7 +144,8 @@ export default function ProductListingPage() {
         if (selectedCategoryId) {
           console.log("FETCHING BRANDS FOR:", selectedCategoryId);
           const response = await fetch(
-            `${API_BASE_URL}/api/brands?category_id=${selectedCategoryId}`
+            `${API_BASE_URL}/api/brands?category_id=${selectedCategoryId}`,
+            { headers: getAuthHeaders() }
           );
           const data = await response.json();
           console.log("BRANDS:", data);

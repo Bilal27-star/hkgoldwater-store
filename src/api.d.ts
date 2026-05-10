@@ -1,9 +1,16 @@
 export const API_URL: string;
 
+export function getBearerJwt(): string | null;
+export function getAuthHeaders(): Record<string, string>;
+export function getAuthorizationHeader(): Record<string, string>;
 export function getToken(): string | null;
 export function setToken(token: string | null | undefined): void;
+export function getJwtPayloadRole(token: string): string | null;
+export function getJwtPayloadEmail(token: string): string | null;
+export function isAdminJwtToken(token: string): boolean;
 
 export const TOKEN_KEY: string;
+export const DZ_API_JWT_KEY: string;
 export const AUTH_CHANGED_EVENT: string;
 export function getErrorMessage(error: unknown, fallback?: string): string;
 
@@ -25,16 +32,20 @@ export function getPages(): Promise<any>;
 export function patchPages(payload: {
   pages: Array<{ key: string; title: string; contentHtml: string }>;
 }): Promise<any>;
-export function createProductApi(payload: {
-  name: string;
-  description?: string;
-  price: number;
-  stock?: number;
-  category_id?: string;
-  brand_id?: string;
-  brand?: string;
-  image_url?: string;
-}): Promise<any>;
+export function createProductApi(
+  payload:
+    | FormData
+    | {
+        name: string;
+        description?: string;
+        price: number;
+        stock?: number;
+        category_id?: string;
+        brand_id?: string;
+        brand?: string;
+        image_url?: string;
+      }
+): Promise<any>;
 export function deleteProductApi(productId: string): Promise<any>;
 
 export function addToCartApi(payload: {

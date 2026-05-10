@@ -3,9 +3,9 @@ import type { ImgHTMLAttributes } from "react";
 export type LogoVariant = "gold" | "dark" | "light";
 
 const LOGO_SRC: Record<LogoVariant, string> = {
-  gold: "/logos/logo-gold.svg",
-  dark: "/logos/logo-dark.svg",
-  light: "/logos/logo-light.svg",
+  gold: "/logo.png",
+  dark: "/logo.png",
+  light: "/logo.png"
 };
 
 const DEFAULT_SIZE = "h-9 md:h-10 w-auto object-contain";

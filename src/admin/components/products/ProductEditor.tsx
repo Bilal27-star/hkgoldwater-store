@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_URL, getBrands } from "../../../api";
+import { getBrands, getToken } from "../../../api";
 import ImageUploader from "./ImageUploader";
 import type { AdminCategory, AdminProduct } from "../../types";
 
@@ -11,6 +11,8 @@ export type ProductEditorPayload = {
   brandId: string;
   stock: number;
   description: string;
+  /** When set, submit uses multipart FormData with these files as field `images`. */
+  imageFiles?: File[];
 };
 
 type Props = {
@@ -32,7 +34,6 @@ export default function ProductEditor({
 }: Props) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [image, setImage] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
@@ -40,6 +41,7 @@ export default function ProductEditor({
   const [brandsError, setBrandsError] = useState<string | null>(null);
   const [stock, setStock] = useState("");
   const [description, setDescription] = useState("");
+  const [images, setImages] = useState<File[]>([]);
 
   function handleCategoryChange(nextCategoryId: string) {
     console.log("[admin.productEditor] selected category_id:", nextCategoryId || "(empty)");
@@ -52,7 +54,6 @@ export default function ProductEditor({
     if (initialProduct) {
       setName(initialProduct.name);
       setPrice(String(initialProduct.price));
-      setImage(initialProduct.image);
       setCategoryId(initialProduct.categoryId);
       setBrandId(initialProduct.brandId || "");
       setStock(String(initialProduct.stock));
@@ -60,13 +61,19 @@ export default function ProductEditor({
     } else {
       setName("");
       setPrice("");
-      setImage("");
       setStock("");
       setDescription("");
       setBrandId("");
-      setCategoryId(categories[0]?.id ?? "");
+      setCategoryId("");
     }
-  }, [initialProduct, categories]);
+  }, [initialProduct]);
+
+
+  useEffect(() => {
+    if (!initialProduct && categories.length > 0) {
+      setCategoryId((prev) => prev || categories[0]?.id || "");
+    }
+  }, [categories, initialProduct]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,16 +122,46 @@ export default function ProductEditor({
     if (readOnly) return;
     const priceNum = Number(price);
     const stockNum = Number(stock);
-    if (!name.trim() || !image.trim() || !categoryId) return;
-    if (Number.isNaN(priceNum) || priceNum < 0 || Number.isNaN(stockNum) || stockNum < 0) return;
+    const existingUrl = String(initialProduct?.image || "").trim();
+    const hasImage =
+      images.length > 0 ||
+      Boolean(existingUrl && !existingUrl.startsWith("blob:") && !existingUrl.startsWith("data:"));
+    console.log("[ProductEditor] submit attempt", {
+      hasJwt: !!getToken(),
+      imageFilesCount: images.length,
+      hasImageGate: hasImage,
+      categoryId,
+      nameLen: name.trim().length
+    });
+    if (!name.trim()) {
+      console.warn("[ProductEditor] blocked: missing name");
+      return;
+    }
+    if (!hasImage) {
+      console.warn("[ProductEditor] blocked: no image / existing URL");
+      return;
+    }
+    if (!categoryId) {
+      console.warn("[ProductEditor] blocked: no category");
+      return;
+    }
+    if (Number.isNaN(priceNum) || priceNum < 0 || Number.isNaN(stockNum) || stockNum < 0) {
+      console.warn("[ProductEditor] blocked: invalid price/stock", { priceNum, stockNum });
+      return;
+    }
+    console.log(
+      "FINAL IMAGES",
+      images.map((f) => ({ name: f.name, size: f.size, type: f.type }))
+    );
     onSubmit({
       name: name.trim(),
       price: priceNum,
-      image: image.trim(),
+      image: images.length ? "" : existingUrl,
       categoryId,
       brandId,
       stock: stockNum,
-      description: description.trim()
+      description: description.trim(),
+      imageFiles: images.length ? images : undefined
     });
   }
 
@@ -243,24 +280,28 @@ export default function ProductEditor({
 
       {!ro && (
         <ImageUploader
-          value={image}
-          onChange={setImage}
+          onChange={(files) => {
+            console.log(
+              "RECEIVED FILES",
+              files.length,
+              files.map((f) => ({ name: f.name, size: f.size, type: f.type }))
+            );
+            setImages(files);
+          }}
+          existingImageUrl={initialProduct?.image?.trim() || ""}
+          maxFiles={4}
           disabled={false}
           maxSizeMb={2}
-          remoteUpload={
-            API_URL
-              ? {
-                  uploadUrl: `${API_URL.replace(/\/$/, "")}/api/products/upload`,
-                  getToken: () => sessionStorage.getItem("dz_api_jwt")
-                }
-              : undefined
-          }
         />
       )}
-      {ro && image && (
+      {ro && initialProduct?.image && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="mb-2 text-xs font-medium uppercase text-slate-500">Image</p>
-          <img src={image} alt="" className="max-h-48 w-auto max-w-full rounded-lg object-contain" />
+          <img
+            src={initialProduct.image}
+            alt=""
+            className="max-h-48 w-auto max-w-full rounded-lg object-contain"
+          />
         </div>
       )}
 

@@ -7,7 +7,14 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { adminLoginApi, getErrorMessage, setToken } from "../../api";
+import {
+  adminLoginApi,
+  getErrorMessage,
+  getJwtPayloadEmail,
+  getJwtPayloadRole,
+  isAdminJwtToken,
+  setToken
+} from "../../api";
 import { ADMIN_SESSION_STORAGE_KEY } from "../constants";
 import type { AdminUser } from "../types";
 
@@ -56,18 +63,26 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         token?: string;
         user?: { email?: string; name?: string; role?: string };
       };
-      if (!payload?.token || !payload?.user) {
+      if (!payload?.token) {
         return { ok: false as const, error: "Invalid admin login response." };
       }
       setToken(payload.token);
-      const role = String(payload.user.role || "admin");
-      if (role !== "admin" && role !== "main_admin" && role !== "superadmin") {
+
+      if (!isAdminJwtToken(payload.token)) {
         return { ok: false as const, error: "Admin access required." };
       }
+
+      const jwtRole = getJwtPayloadRole(payload.token) || "admin";
+      const roleForUi: AdminUser["role"] =
+        jwtRole === "superadmin" ? "superadmin" : "admin";
+
       const next: AdminUser = {
-        email: String(payload.user.email || normalizedEmail),
-        name: String(payload.user.name || "Admin"),
-        role
+        email:
+          (payload.user?.email && String(payload.user.email)) ||
+          getJwtPayloadEmail(payload.token) ||
+          normalizedEmail,
+        name: payload.user?.name ? String(payload.user.name) : "Admin",
+        role: roleForUi
       };
       writeSession(next);
       setUser(next);

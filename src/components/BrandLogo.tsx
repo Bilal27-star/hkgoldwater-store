@@ -1,5 +1,3 @@
-import Logo from "./ui/Logo";
-
 export type BrandLogoVariant = "header" | "auth" | "admin" | "adminAuth";
 
 const variantClass: Record<BrandLogoVariant, string> = {
@@ -18,14 +16,16 @@ type Props = {
   alt?: string;
 };
 
-/** Light-surface logo (`logo-dark.svg`) — sizing only per variant. */
-export default function BrandLogo({ variant, className = "", alt = "HKGoldWater" }: Props) {
+/** Light-surface logo sizing only per variant. */
+export default function BrandLogo({ variant, className = "", alt = "Logo" }: Props) {
   const loading = variant === "header" ? "eager" : "lazy";
   return (
-    <Logo
-      variant="dark"
-      useDefaultSize={false}
+    <img
+      src="/logo.png"
       alt={alt}
+      width={256}
+      height={256}
+      decoding="async"
       loading={loading}
       className={`block shrink-0 object-contain object-left ${variantClass[variant]} ${className}`}
     />

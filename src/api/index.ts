@@ -2,10 +2,109 @@ import { API_BASE_URL } from "./config";
 
 export const API_URL = API_BASE_URL;
 const API_BASE = `${API_URL}/api`;
-export const TOKEN_KEY = "token";
+/** Single canonical localStorage key for JWT (read/write everywhere). */
+export const DZ_API_JWT_KEY = "dz_api_jwt";
+/** Same string as {@link DZ_API_JWT_KEY}; kept for older imports. */
+export const TOKEN_KEY = DZ_API_JWT_KEY;
 export const AUTH_CHANGED_EVENT = "gold-water-auth-changed";
 
-type ApiRequestOptions = RequestInit & { headers?: Record<string, string>; requireAuth?: boolean };
+/** Deprecated keys — removed from storage whenever we read/write JWT (never read these for auth). */
+const LEGACY_JWT_KEYS = ["token", "access_token", "auth_token", "jwt"] as const;
+
+function removeLegacyJwtKeys(): void {
+  if (typeof localStorage === "undefined") return;
+  for (const k of LEGACY_JWT_KEYS) {
+    localStorage.removeItem(k);
+  }
+}
+
+/** Extract JWT from typical auth JSON bodies (`token` | `access_token` | `jwt`). */
+function extractJwtFromResponseBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+
+  const tryExtract = (obj: any): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    const raw = obj.token ?? obj.access_token ?? obj.jwt;
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  };
+
+  // direct
+  let token = tryExtract(body);
+  if (token) return token;
+
+  // nested common patterns
+  const b = body as any;
+  if (b.data) {
+    token = tryExtract(b.data);
+    if (token) return token;
+  }
+
+  if (b.user) {
+    token = tryExtract(b.user);
+    if (token) return token;
+  }
+
+  if (b.result) {
+    token = tryExtract(b.result);
+    if (token) return token;
+  }
+
+  return null;
+}
+
+/** Decode JWT payload JSON (no signature verification — client-side hints only). */
+function decodeJwtPayloadJson(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base64.length % 4;
+    if (pad) base64 += "=".repeat(4 - pad);
+    const json = atob(base64);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Decode JWT `role` claim only (no signature verification — UI routing). */
+export function getJwtPayloadRole(token: string): string | null {
+  try {
+    const payload = decodeJwtPayloadJson(token);
+    if (!payload || payload.role == null) return null;
+    return String(payload.role).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Decode JWT `email` claim (admin login returns `{ token }` only). */
+export function getJwtPayloadEmail(token: string): string | null {
+  const payload = decodeJwtPayloadJson(token);
+  if (!payload || payload.email == null) return null;
+  const s = String(payload.email).trim();
+  return s || null;
+}
+
+export function isAdminJwtToken(token: string): boolean {
+  const role = getJwtPayloadRole(token);
+  return role === "admin" || role === "main_admin" || role === "superadmin";
+}
+
+type ApiRequestOptions = RequestInit & { headers?: HeadersInit; requireAuth?: boolean };
+
+function headersInitToRecord(h: HeadersInit | undefined): Record<string, string> {
+  if (!h) return {};
+  if (typeof Headers !== "undefined" && h instanceof Headers) {
+    const out: Record<string, string> = {};
+    h.forEach((value, key) => {
+      out[key] = value;
+    });
+    return out;
+  }
+  if (Array.isArray(h)) return Object.fromEntries(h);
+  return { ...(h as Record<string, string>) };
+}
 
 function isJsonResponse(response: Response) {
   return response.headers.get("content-type")?.includes("application/json");
@@ -37,18 +136,49 @@ function resolveApiError(response: Response, payload: unknown): Error {
   return new Error(errorFromPayload || fallback);
 }
 
-export function getToken(): string | null {
+/** Read JWT only from `dz_api_jwt`. Legacy keys are purged, not read. */
+export function getBearerJwt(options?: { silent?: boolean }): string | null {
   if (typeof localStorage === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  removeLegacyJwtKeys();
+  const jwt = localStorage.getItem(DZ_API_JWT_KEY);
+  if (!options?.silent) {
+    console.log("[auth] reading token", {
+      key: DZ_API_JWT_KEY,
+      found: Boolean(jwt && jwt.length > 0),
+      length: jwt?.length ?? 0
+    });
+  }
+  return jwt;
 }
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = getBearerJwt({ silent: true });
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function getAuthorizationHeader(): Record<string, string> {
+  return getAuthHeaders();
+}
+
+export function getToken(): string | null {
+  return getBearerJwt({ silent: true });
+}
+
+/** Persist JWT only under `dz_api_jwt`; strip deprecated keys. */
 export function setToken(token: string | null | undefined): void {
   if (typeof localStorage === "undefined") return;
+  removeLegacyJwtKeys();
   if (!token) {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(DZ_API_JWT_KEY);
     localStorage.removeItem("gold_water_auth_user");
+    console.log("[auth] saving token", { key: DZ_API_JWT_KEY, action: "cleared" });
   } else {
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(DZ_API_JWT_KEY, token);
+    console.log("[auth] saving token", {
+      key: DZ_API_JWT_KEY,
+      length: token.length,
+      action: "stored"
+    });
   }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT));
@@ -61,29 +191,61 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
 }
 
 async function request(path: string, options: ApiRequestOptions = {}) {
-  const token = getToken();
-  if (options.requireAuth && !token) {
-    throw new Error("Authentication required. Please log in.");
+  const { requireAuth, ...fetchInit } = options;
+  const token = getBearerJwt();
+
+  const isFormData =
+    typeof FormData !== "undefined" && fetchInit.body instanceof FormData;
+
+  console.log("[api.request]", {
+    path,
+    method: fetchInit.method || "GET",
+    requireAuth,
+    hasJwt: !!token,
+    isFormData
+  });
+  if (requireAuth && !token) {
+    console.warn(
+      "[api.request] requireAuth=true but no JWT in localStorage — request will not send Authorization",
+      { path, key: DZ_API_JWT_KEY }
+    );
   }
+
+  const customHeaders = headersInitToRecord(fetchInit.headers);
+  const authHeaders = getAuthHeaders();
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers || {})
+    ...customHeaders,
+    ...authHeaders
   };
 
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (isFormData) {
+    // Do not set Content-Type — browser adds multipart/form-data + boundary.
+    delete headers["Content-Type"];
+    delete headers["content-type"];
+  } else {
+    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+  }
+
+  console.log("FINAL HEADERS", headers);
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      ...options,
+      ...fetchInit,
       headers
     });
-  } catch {
+  } catch (err) {
+    console.error("[api.request] network error", path, err);
     throw new Error("Network error. Please check your connection.");
   }
 
+  console.log("[api.request] response", { path, status: response.status });
   const payload = await parseResponseBody(response);
-  if (!response.ok) throw resolveApiError(response, payload);
+  if (!response.ok) {
+    console.error("[api.request] error body", { path, status: response.status, payload });
+    throw resolveApiError(response, payload);
+  }
   return payload;
 }
 
@@ -147,25 +309,48 @@ export async function patchPages(payload: {
   });
 }
 
-export async function createProductApi(payload: {
-  name: string;
-  description?: string;
-  price: number;
-  stock?: number;
-  category_id?: string;
-  brand_id?: string;
-  brand?: string;
-  image_url?: string;
-}) {
+export async function createProductApi(
+  payload:
+    | FormData
+    | {
+        name: string;
+        description?: string;
+        price: number;
+        stock?: number;
+        category_id?: string;
+        brand_id?: string;
+        brand?: string;
+        image_url?: string;
+      }
+) {
+  if (typeof FormData !== "undefined" && payload instanceof FormData) {
+    let imageCount = 0;
+    payload.forEach((_v, k) => {
+      if (k === "images") imageCount++;
+    });
+    console.log("[createProductApi] POST /products FormData", {
+      imageFields: imageCount,
+      hasJwt: !!getBearerJwt(),
+      authHeader: "Authorization: Bearer <dz_api_jwt> via request()"
+    });
+    return request("/products", {
+      method: "POST",
+      body: payload,
+      requireAuth: true
+    });
+  }
+  console.log("[createProductApi] JSON body", { hasJwt: !!getBearerJwt() });
   return request("/products", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    requireAuth: true
   });
 }
 
 export async function deleteProductApi(productId: string) {
   return request(`/products/${encodeURIComponent(productId)}`, {
-    method: "DELETE"
+    method: "DELETE",
+    requireAuth: true
   });
 }
 
@@ -248,6 +433,13 @@ export async function loginApi(payload: { email: string; password: string }) {
 
   const body = await parseResponseBody(response);
   if (!response.ok) throw resolveApiError(response, body);
+
+  const jwt = extractJwtFromResponseBody(body);
+  if (jwt) {
+    setToken(jwt);
+  } else {
+    console.warn("[loginApi] success response missing token / access_token / jwt", body);
+  }
   return body;
 }
 
@@ -288,10 +480,20 @@ export async function logoutApi() {
 }
 
 export async function adminLoginApi(payload: { email: string; password: string }) {
-  return request("/admin/login", {
+  const body = await request("/admin/login", {
     method: "POST",
     body: JSON.stringify(payload)
   });
+
+  console.log("[adminLoginApi] FULL RESPONSE", body);
+
+  const jwt = extractJwtFromResponseBody(body);
+  if (jwt) {
+    setToken(jwt);
+  } else if (body && typeof body === "object") {
+    console.warn("[adminLoginApi] response missing token / access_token / jwt", body);
+  }
+  return body;
 }
 
 /** Whitelist PATCH body keys; map legacy display-name keys to `name` only (never sends snake-case alias). */

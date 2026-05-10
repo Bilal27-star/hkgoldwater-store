@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
-import { addToCartApi, clearCartApi, getCartApi, removeCartItemApi } from "../api";
+import { addToCartApi, clearCartApi, getCartApi, getToken, removeCartItemApi } from "../api";
 
 export type CartItem = {
   id: string;
@@ -112,7 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items]);
 
   const syncCartFromApi = useCallback(async () => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     if (!token) return;
     const data = await getCartApi();
     console.log("[cart] fetched cart:", data);
@@ -141,7 +141,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [syncCartFromApi]);
 
   const ensureServerCartForCheckout = useCallback(async () => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     if (!token) return;
     console.log("CART STATE:", items);
     if (items.length === 0) return;
@@ -165,7 +165,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeFromCart = useCallback(
     (id: string) => {
       setItems((prev) => prev.filter((p) => p.id !== id));
-      const token = localStorage.getItem("token");
+      const token = getToken();
       if (!token) {
         console.log("[cart] remove action result:", { productId: id, backend: "skipped-no-token" });
         return;
@@ -225,7 +225,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
-    const token = localStorage.getItem("token");
+    const token = getToken();
     if (!token) return;
     void (async () => {
       try {

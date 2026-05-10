@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "dev": "NODE_ENV=development node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed:admin": "node scripts/ensure-admin.mjs",
+    "set:admin-password": "node scripts/set-admin-password.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.10",
@@ -16,6 +18,7 @@
     "express-rate-limit": "^8.4.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "ws": "^8.20.0"
   }
 }

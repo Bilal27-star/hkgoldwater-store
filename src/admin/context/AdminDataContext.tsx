@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { createProductApi, deleteProductApi, getCategories, getProductsApi } from "../../api";
+import {
+  createProductApi,
+  deleteProductApi,
+  getCategories,
+  getProductsApi,
+  getToken
+} from "../../api";
 import { ADMIN_DATA_STORAGE_KEY } from "../constants";
 import {
   defaultSettings,
@@ -60,7 +66,9 @@ type AdminDataContextValue = {
   orders: AdminOrder[];
   customers: AdminCustomer[];
   settings: SiteSettings;
-  addProduct: (p: Omit<AdminProduct, "id" | "createdAt" | "updatedAt">) => Promise<AdminProduct>;
+  addProduct: (
+    p: Omit<AdminProduct, "id" | "createdAt" | "updatedAt"> & { imageFiles?: File[] }
+  ) => Promise<AdminProduct>;
   updateProduct: (id: string, patch: Partial<AdminProduct>) => void;
   deleteProduct: (id: string) => Promise<void>;
   addCategory: (name: string) => AdminCategory;
@@ -92,7 +100,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       id: String(item.id),
       name: resolveLocalizedText(item.name) || item.title || "Product",
       price: Number(item.price || 0),
-      image: item.image_url || item.image || "",
+      image:
+        item.image_url ||
+        item.image ||
+        (Array.isArray(item.images) && item.images.length ? String(item.images[0]) : "") ||
+        "",
       categoryId: String(item.category_id || ""),
       brandId: String(item.brand_id || ""),
       brand: item.brand || "",
@@ -176,7 +188,31 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   }, [refreshCategories]);
 
   const addProduct = useCallback(
-    async (p: Omit<AdminProduct, "id" | "createdAt" | "updatedAt">) => {
+    async (p: Omit<AdminProduct, "id" | "createdAt" | "updatedAt"> & { imageFiles?: File[] }) => {
+      if (p.imageFiles && p.imageFiles.length > 0) {
+        console.log("[admin.addProduct] multipart branch", {
+          fileCount: p.imageFiles.length,
+          hasJwt: !!getToken(),
+          categoryId: p.categoryId
+        });
+        const fd = new FormData();
+        fd.append("name", p.name);
+        fd.append("description", p.description || "");
+        fd.append("price", String(p.price));
+        fd.append("stock", String(p.stock));
+        fd.append("category_id", p.categoryId);
+        if (p.brandId) fd.append("brand_id", p.brandId);
+        p.imageFiles.forEach((file) => fd.append("images", file));
+        console.log("[admin.addProduct] FormData keys appended", {
+          imagesAppended: p.imageFiles.length,
+          sampleNames: p.imageFiles.map((f) => f.name)
+        });
+        const created = await createProductApi(fd);
+        const mapped = mapApiProductToAdminProduct(created);
+        setAndPersist((s) => ({ ...s, products: [mapped, ...s.products] }));
+        return mapped;
+      }
+      console.log("[admin.addProduct] JSON branch", { hasJwt: !!getToken() });
       const payload = {
         name: p.name,
         description: p.description || undefined,
@@ -186,7 +222,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         brand_id: p.brandId || undefined,
         image_url: p.image || undefined
       };
-      console.log("Creating product:", payload);
+      console.log("[admin.addProduct] payload", payload);
       const created = await createProductApi(payload);
       const mapped = mapApiProductToAdminProduct(created);
       setAndPersist((s) => ({ ...s, products: [mapped, ...s.products] }));

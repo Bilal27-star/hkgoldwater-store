@@ -5,6 +5,29 @@ function asText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Escape `%`, `_`, `\` for ILIKE so emails match literally (case-insensitive). */
+function escapeIlikeExact(value) {
+  return String(value).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+/**
+ * Lookup by exact lowercase email first; fallback to ILIKE for mixed-case emails in DB.
+ */
+async function fetchUserForAdminLogin(supabase, emailNorm) {
+  const columns = "id,email,password_hash,role,name";
+  const base = () => supabase.from("admins").select(columns);
+
+  let { data, error } = await base().eq("email", emailNorm).maybeSingle();
+  if (error) return { user: null, error };
+  if (data) return { user: data, error: null };
+
+  const { data: data2, error: err2 } = await base()
+    .ilike("email", escapeIlikeExact(emailNorm))
+    .limit(1)
+    .maybeSingle();
+  return { user: data2 ?? null, error: err2 };
+}
+
 export async function listAdmins(req, res) {
   try {
     const supabase = req.app.locals.supabase;
@@ -101,50 +124,110 @@ export async function deleteAdmin(req, res) {
   }
 }
 
-export async function loginAdmin(req, res) {
+/**
+ * One-time / emergency: set bcrypt password for an admin email on the live DB.
+ * Requires env ADMIN_SYNC_TOKEN (long random). Send header: X-Admin-Sync-Token
+ * Body JSON: { email, password } — password min 6 chars (e.g. 123456).
+ * Remove ADMIN_SYNC_TOKEN from hosting env after use.
+ */
+export async function syncAdminCredentials(req, res) {
+  const expected = process.env.ADMIN_SYNC_TOKEN;
+  const got = String(
+    req.headers["x-admin-sync-token"] || req.headers["X-Admin-Sync-Token"] || ""
+  ).trim();
+
+  if (!expected || got !== expected) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
   const email = asText(req.body?.email).toLowerCase();
   const password = asText(req.body?.password);
   if (!email || !password) {
     return res.status(400).json({ error: "email and password are required" });
   }
+  if (password.length < 6) {
+    return res.status(400).json({ error: "password must be at least 6 characters" });
+  }
 
-  if (!process.env.JWT_SECRET) {
+  try {
+    const supabase = req.app.locals.supabase;
+    const hash = await bcrypt.hash(password, 10);
+
+    const { data: existing, error: e1 } = await supabase.from("admins").select("id").eq("email", email).maybeSingle();
+    if (e1) throw e1;
+
+    if (existing?.id) {
+      const { error: e2 } = await supabase.from("admins").update({ password_hash: hash }).eq("id", existing.id);
+      if (e2) throw e2;
+      console.log("[admin.sync] password updated for", email);
+      return res.json({ ok: true, updated: true });
+    }
+
+    const { error: e3 } = await supabase
+      .from("admins")
+      .insert({ name: "Admin", email, role: "admin", password_hash: hash });
+    if (e3) throw e3;
+    console.log("[admin.sync] admin created for", email);
+    return res.json({ ok: true, created: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "sync failed";
+    console.error("[admin.sync] error", message);
+    return res.status(500).json({ error: message });
+  }
+}
+
+const UNAUTHORIZED = { error: "Invalid email or password" };
+
+/**
+ * POST /api/admin/login → mounted as POST /api/admin/login (see routes/admin.js + server.js).
+ * Uses `bcrypt` (already in package.json). Peer API matches `bcryptjs` at runtime.
+ */
+export async function loginAdmin(req, res) {
+  const email = asText(req.body?.email).toLowerCase();
+  const password = asText(req.body?.password);
+
+  console.log("EMAIL:", email);
+  console.log("INPUT PASSWORD:", password);
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
+
+  const SECRET = process.env.JWT_SECRET;
+  if (!SECRET) {
+    console.error("[admin.login] JWT_SECRET is not set");
     return res.status(500).json({ error: "JWT_SECRET is not configured" });
   }
 
   try {
     const supabase = req.app.locals.supabase;
-    const { data, error } = await supabase
-      .from("admins")
-      .select("id,name,email,role,password_hash")
-      .eq("email", email)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data?.password_hash) {
-      return res.status(401).json({ error: "Invalid email or password" });
+    const { user, error: lookupError } = await fetchUserForAdminLogin(supabase, email);
+
+    if (lookupError) {
+      console.error("[admin.login] Supabase lookup error:", lookupError.message || lookupError);
+      throw lookupError;
     }
 
-    const valid = await bcrypt.compare(password, data.password_hash);
-    if (!valid) return res.status(401).json({ error: "Invalid email or password" });
+    console.log("USER FROM DB:", user);
+    console.log("HASH:", user?.password_hash);
 
-    const token = jwt.sign(
-      { id: data.id, email: data.email, role: data.role || "admin" },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    if (!user || !user.password_hash) {
+      console.log("COMPARE RESULT:", "(skipped — missing user or password_hash)");
+      return res.status(401).json(UNAUTHORIZED);
+    }
 
-    return res.json({
-      token,
-      user: {
-        id: data.id,
-        email: data.email,
-        name: data.name ?? "Admin",
-        role: data.role ?? "admin"
-      }
-    });
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    console.log("COMPARE RESULT:", isValid);
+
+    if (!isValid) {
+      return res.status(401).json(UNAUTHORIZED);
+    }
+
+    const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: "7d" });
+    return res.json({ token });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to login admin";
-    console.error("[admin.login] error", message);
+    console.error("[admin.login]", message);
     return res.status(500).json({ error: message });
   }
 }

@@ -1,179 +1,148 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ImageIcon, Trash2, Upload } from "lucide-react";
 
+const DEBUG = "[ImageUploader]";
 const DEFAULT_MAX_MB = 2;
-
-export type RemoteImageUpload = {
-  /** e.g. `${import.meta.env.VITE_API_URL}/products/upload` */
-  uploadUrl: string;
-  getToken: () => string | null;
-};
+const DEFAULT_MAX_FILES = 4;
 
 type Props = {
-  value: string;
-  onChange: (next: string) => void;
+  onChange: (files: File[]) => void;
+  existingImageUrl?: string;
+  maxFiles?: number;
   disabled?: boolean;
   maxSizeMb?: number;
-  /** When set, selected images upload immediately with XHR progress; `onChange` receives public `/uploads/...` URL. */
-  remoteUpload?: RemoteImageUpload;
-  /** Fires when the user selects or clears a local file (before/after remote upload). */
-  onPickFile?: (file: File | null) => void;
 };
 
 export default function ImageUploader({
-  value,
   onChange,
+  existingImageUrl = "",
+  maxFiles = DEFAULT_MAX_FILES,
   disabled = false,
-  maxSizeMb = DEFAULT_MAX_MB,
-  remoteUpload,
-  onPickFile
+  maxSizeMb = DEFAULT_MAX_MB
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Latest selected files (for append); not in React state because UI uses `previews` only. */
+  const filesRef = useRef<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [previews, setPreviews] = useState<string[]>([]);
 
-  useEffect(() => {
-    return () => {
-      if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-    };
-  }, [value]);
+  const existing = existingImageUrl.trim();
+  const hasBlobPreviews = previews.length > 0;
+  const renderUrls = hasBlobPreviews ? previews : existing ? [existing] : [];
+  const emptyUi = renderUrls.length === 0;
 
-  const uploadRemote = useCallback(
-    (file: File) => {
-      if (!remoteUpload) return;
-      const token = remoteUpload.getToken();
-      if (!token) {
-        toast.error("Not signed in to API — set sessionStorage dz_api_jwt after login.");
-        return;
-      }
+  function revokePreviewUrls(urls: string[]) {
+    urls.forEach((u) => {
+      if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+    });
+  }
 
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", remoteUpload.uploadUrl, true);
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          setUploadProgress(Math.round((100 * e.loaded) / e.total));
-        }
-      };
-
-      xhr.onload = () => {
-        setUploading(false);
-        setUploadProgress(null);
-        if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-        try {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const data = JSON.parse(xhr.responseText) as { url?: string };
-            if (data.url) {
-              onChange(data.url);
-              onPickFile?.(null);
-              toast.success("Image uploaded");
-            } else {
-              toast.error("Upload response missing url");
-            }
-          } else {
-            const err = JSON.parse(xhr.responseText || "{}") as { error?: string; message?: string };
-            toast.error(err.error || err.message || `Upload failed (${xhr.status})`);
-          }
-        } catch {
-          toast.error("Upload failed");
-        }
-      };
-
-      xhr.onerror = () => {
-        setUploading(false);
-        setUploadProgress(null);
-        toast.error("Network error during upload");
-      };
-
-      const fd = new FormData();
-      fd.append("image", file);
-      setUploading(true);
-      setUploadProgress(0);
-      xhr.send(fd);
-    },
-    [remoteUpload, onChange, onPickFile, value]
-  );
-
-  const processFile = useCallback(
-    (file: File) => {
+  function validateAndCollect(raw: File[]): File[] {
+    const out: File[] = [];
+    for (const file of raw) {
       if (!file.type.startsWith("image/")) {
-        toast.error("Please choose an image file.");
-        return;
+        toast.error("Please choose image files only.");
+        console.warn(DEBUG, "rejected non-image", file.name, file.type);
+        return [];
       }
       if (file.size > maxSizeMb * 1024 * 1024) {
-        toast.error(`Image must be ${maxSizeMb}MB or smaller.`);
-        return;
+        toast.error(`Each image must be ${maxSizeMb}MB or smaller.`);
+        console.warn(DEBUG, "rejected large file", file.name, file.size);
+        return [];
       }
+      out.push(file);
+    }
+    return out;
+  }
 
-      onPickFile?.(file);
+  /** Append incoming images after current selection, capped at maxFiles. */
+  function appendIncoming(raw: FileList | File[], from: string) {
+    const selected = Array.from(raw);
+    console.log("INPUT:", selected.length);
+    console.log(DEBUG, "appendIncoming", from, { selected: selected.length, maxFiles });
 
-      if (remoteUpload) {
-        if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-        const preview = URL.createObjectURL(file);
-        onChange(preview);
-        uploadRemote(file);
-        return;
-      }
+    if (!selected.length) return;
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const r = reader.result;
-        if (typeof r === "string") onChange(r);
-      };
-      reader.readAsDataURL(file);
-    },
-    [maxSizeMb, onChange, onPickFile, remoteUpload, uploadRemote, value]
-  );
+    const incoming = validateAndCollect(selected);
+    if (!incoming.length) return;
+
+    const merged = [...filesRef.current, ...incoming].slice(0, maxFiles);
+    filesRef.current = merged;
+
+    console.log(
+      "FILES_SELECTED",
+      merged.map((f) => ({ name: f.name, size: f.size, type: f.type }))
+    );
+
+    setPreviews((prevPreviews) => {
+      revokePreviewUrls(prevPreviews);
+      return merged.map((f) => URL.createObjectURL(f));
+    });
+
+    onChange(merged);
+    console.log("FILES STATE:", merged);
+  }
+
+  function triggerFileDialog(source: string) {
+    const el = fileInputRef.current;
+    console.log(DEBUG, "triggerFileDialog", source, { hasInput: !!el, disabled });
+    if (!el || disabled) return;
+    try {
+      el.click();
+      console.log(DEBUG, "triggerFileDialog click() invoked");
+    } catch (err) {
+      console.error(DEBUG, "triggerFileDialog failed", err);
+    }
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = e.target.files;
+    console.log(DEBUG, "input change", { fileCount: list?.length ?? 0 });
+    if (list?.length) {
+      appendIncoming(list, "input");
+    }
+    // clear AFTER processing to avoid losing multi-select in some browsers
+    try {
+      e.target.value = "";
+    } catch {}
+  }
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOver(false);
-    if (disabled || uploading) return;
-    const f = e.dataTransfer.files?.[0];
-    if (f) processFile(f);
+    if (disabled) return;
+    console.log(DEBUG, "drop", { count: e.dataTransfer.files?.length });
+    if (e.dataTransfer.files?.length) appendIncoming(e.dataTransfer.files, "drop");
   };
 
   function handleRemove() {
-    if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-    onChange("");
-    onPickFile?.(null);
-    setUploadProgress(null);
-    setUploading(false);
+    console.log(DEBUG, "remove all images");
+    revokePreviewUrls(previews);
+    filesRef.current = [];
+    setPreviews([]);
+    onChange([]);
+    console.log("FILES STATE:", []);
   }
 
   return (
     <div className="space-y-3">
       <span className="block text-sm font-medium text-slate-700">Product image *</span>
-      {uploadProgress !== null && (
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-1 flex justify-between text-xs text-slate-600">
-            <span>{uploading ? "Uploading…" : "Upload"}</span>
-            <span>{uploadProgress}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-[#1565C0] transition-[width] duration-150"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
       <div
         onDragEnter={(e) => {
           e.preventDefault();
-          if (!disabled && !uploading) setDragOver(true);
+          if (!disabled) setDragOver(true);
         }}
         onDragOver={(e) => {
           e.preventDefault();
-          if (!disabled && !uploading) setDragOver(true);
+          if (!disabled) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={`relative overflow-hidden rounded-xl border-2 border-dashed transition ${
-          disabled || uploading
+          disabled
             ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
             : dragOver
               ? "border-[#1565C0] bg-blue-50/80"
@@ -181,43 +150,54 @@ export default function ImageUploader({
         }`}
       >
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
-          className="sr-only"
-          disabled={disabled || uploading}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) processFile(f);
-          }}
+          multiple
+          disabled={disabled}
+          tabIndex={-1}
+          className={
+            emptyUi
+              ? "absolute inset-0 z-10 block min-h-[220px] w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              : "sr-only"
+          }
+          onChange={handleInputChange}
         />
 
-        {value ? (
-          <div className="relative p-4">
+        {!emptyUi ? (
+          <div className="relative z-0 p-4">
             <div className="relative mx-auto max-h-56 max-w-full overflow-hidden rounded-lg bg-white shadow-inner ring-1 ring-slate-200">
-              <img
-                src={value}
-                alt=""
-                className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
-              />
+              {renderUrls.map((src, i) => (
+                <img
+                  key={`${i}-${src}`}
+                  src={src}
+                  alt=""
+                  className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
+                />
+              ))}
             </div>
             {!disabled && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <div className="relative z-20 mt-4 flex flex-wrap justify-center gap-2">
                 <button
                   type="button"
-                  disabled={uploading}
-                  onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-[#1565C0] hover:text-[#1565C0] disabled:opacity-50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    triggerFileDialog("replace-button");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-[#1565C0] hover:text-[#1565C0]"
                 >
                   <Upload className="h-4 w-4" aria-hidden />
                   Replace image
                 </button>
                 <button
                   type="button"
-                  disabled={uploading}
-                  onClick={handleRemove}
-                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 disabled:opacity-50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRemove();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden />
                   Remove
@@ -226,12 +206,7 @@ export default function ImageUploader({
             )}
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={disabled || uploading}
-            onClick={() => inputRef.current?.click()}
-            className="flex w-full flex-col items-center justify-center gap-3 px-6 py-12 text-center transition disabled:cursor-not-allowed"
-          >
+          <div className="pointer-events-none relative z-0 flex min-h-[220px] w-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
               <ImageIcon className="h-7 w-7" aria-hidden />
             </span>
@@ -243,7 +218,7 @@ export default function ImageUploader({
               Upload from your device
             </span>
             <p className="text-xs text-slate-400">PNG, JPG, WebP — max {maxSizeMb}MB</p>
-          </button>
+          </div>
         )}
       </div>
     </div>

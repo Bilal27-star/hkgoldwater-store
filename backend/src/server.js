@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { createClient } from "@supabase/supabase-js";
@@ -16,9 +18,14 @@ import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import { getProfile, patchProfile } from "./routes/users.js";
 import auth from "./middleware/auth.js";
+import { authDebug } from "./utils/authDebug.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = Number(process.env.PORT) || 5000;
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error("❌ ENV ERROR: Missing Supabase credentials");
@@ -38,6 +45,42 @@ app.locals.supabase = createClient(
   }
 );
 
+/**
+ * Optional: set ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD in .env, restart API once.
+ * Upserts bcrypt hash so admin login works (no UI change). Remove vars after first login in production.
+ */
+(async () => {
+  const email = process.env.ADMIN_SEED_EMAIL?.trim().toLowerCase();
+  const plain = process.env.ADMIN_SEED_PASSWORD;
+  if (!email || !plain) return;
+
+  try {
+    const supabase = app.locals.supabase;
+    const hash = await bcrypt.hash(String(plain), 10);
+    const { data: existing, error: e1 } = await supabase.from("admins").select("id").eq("email", email).maybeSingle();
+    if (e1) {
+      console.error("[admin-seed] lookup error:", e1.message);
+      return;
+    }
+    if (existing?.id) {
+      const { error: e2 } = await supabase.from("admins").update({ password_hash: hash }).eq("id", existing.id);
+      if (e2) console.error("[admin-seed] update error:", e2.message);
+      else console.log("[admin-seed] password hash synced for", email);
+      return;
+    }
+    const { error: e3 } = await supabase.from("admins").insert({
+      name: "Admin",
+      email,
+      role: "admin",
+      password_hash: hash
+    });
+    if (e3) console.error("[admin-seed] insert error:", e3.message);
+    else console.log("[admin-seed] admin row created for", email);
+  } catch (err) {
+    console.error("[admin-seed] failed:", err);
+  }
+})();
+
 // 🔍 Test Supabase connection on boot
 (async () => {
   try {
@@ -54,10 +97,14 @@ app.locals.supabase = createClient(
 
 app.use(
   cors({
-    origin: "*",
-    credentials: false
+    origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
+
+app.options("*", cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use((req, _res, next) => {
@@ -84,10 +131,12 @@ app.post("/api/auth/login", async (req, res) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
-    console.log("LOGIN REQUEST:", email);
+    authDebug("server-auth-login.request", { incomingEmail: email, passwordLength: password.length });
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      const body = { message: "Email and password are required" };
+      authDebug("server-auth-login.response", { status: 400, body });
+      return res.status(400).json(body);
     }
 
     const supabase = req.app.locals.supabase;
@@ -98,35 +147,70 @@ app.post("/api/auth/login", async (req, res) => {
       .eq("email", email)
       .single();
 
+    authDebug("server-auth-login.lookup", {
+      incomingEmail: email,
+      userFound: Boolean(user && !error),
+      supabaseError: error?.message ?? null,
+      userId: user?.id ?? null,
+      hasPasswordHash: Boolean(user?.password_hash),
+      storedPasswordHash: user?.password_hash ?? null
+    });
+
     if (error || !user) {
-      return res.status(401).json({ message: "User not found" });
+      const body = { message: "User not found" };
+      authDebug("server-auth-login.response", { status: 401, body, reason: "user_not_found_or_db_error" });
+      return res.status(401).json(body);
     }
 
     if (!user.password_hash) {
-      return res.status(401).json({ message: "Wrong password" });
+      const body = { message: "Wrong password" };
+      authDebug("server-auth-login.response", { status: 401, body, reason: "missing_password_hash" });
+      return res.status(401).json(body);
     }
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    let isMatch = false;
+    let compareError = null;
+    try {
+      isMatch = await bcrypt.compare(password, user.password_hash);
+    } catch (e) {
+      compareError = e instanceof Error ? e.message : String(e);
+      isMatch = false;
+    }
+    authDebug("server-auth-login.bcrypt", {
+      bcryptCompareResult: isMatch,
+      compareThrew: compareError != null,
+      compareError
+    });
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Wrong password" });
+      const body = { message: "Wrong password" };
+      authDebug("server-auth-login.response", { status: 401, body, reason: "password_mismatch" });
+      return res.status(401).json(body);
     }
 
     if (!process.env.JWT_SECRET) {
       console.error("❌ Missing JWT_SECRET");
-      return res.status(500).json({ message: "JWT_SECRET is not configured" });
+      const body = { message: "JWT_SECRET is not configured" };
+      authDebug("server-auth-login.response", { status: 500, body });
+      return res.status(500).json(body);
     }
 
-    const token = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const jwtPayload = { id: user.id };
+    authDebug("server-auth-login.jwt", { payload: jwtPayload });
 
-    return res.json({ token, user });
+    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+    authDebug("server-auth-login.jwt", { token });
+
+    const responseBody = { token, user };
+    authDebug("server-auth-login.response", { status: 200, body: responseBody });
+
+    return res.json(responseBody);
   } catch (err) {
     console.error("LOGIN ERROR:", err);
-    return res.status(500).json({ message: "Server error" });
+    const body = { message: "Server error" };
+    authDebug("server-auth-login.response", { status: 500, body });
+    return res.status(500).json(body);
   }
 });
 

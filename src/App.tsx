@@ -26,6 +26,7 @@ import SocialMediaManagement from "./admin/pages/SocialMediaManagement";
 import { AdminAuthProvider } from "./admin/context/AdminAuthContext";
 import { AdminDataProvider } from "./admin/context/AdminDataContext";
 import { API_BASE_URL } from "./api/config";
+import { getAuthHeaders, getToken, isAdminJwtToken, setToken } from "./api";
 
 function AdminCatchAll() {
   return <Navigate to="/admin" replace />;
@@ -41,27 +42,25 @@ function Layout() {
 }
 
 export default function App() {
-  const isAuthenticated = !!localStorage.getItem("token");
+  const isAuthenticated = !!getToken();
   console.log("isAuthenticated:", isAuthenticated);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     console.log("TOKEN FOUND:", !!token);
     if (!token) return;
+    if (isAdminJwtToken(token)) return;
 
     (async () => {
       try {
         console.log("PROFILE FETCH:", `${API_BASE_URL}/api/users/profile`);
         const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         });
         const payload = await response.json().catch(() => null);
         console.log("PROFILE FETCH:", response.status, payload);
         if (!response.ok) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("gold_water_auth_user");
+          if (response.status === 401) setToken(null);
           return;
         }
         if (payload && typeof payload === "object") {
@@ -69,8 +68,6 @@ export default function App() {
         }
       } catch (error) {
         console.error("PROFILE FETCH:", error);
-        localStorage.removeItem("token");
-        localStorage.removeItem("gold_water_auth_user");
       }
     })();
   }, []);

@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
 
+/**
+ * Bearer JWT verification. On success attaches:
+ * `req.user = { id, email, role }` (values from verified JWT payload).
+ */
 export default function auth(req, res, next) {
   const token = req.headers.authorization?.startsWith("Bearer ")
     ? req.headers.authorization.split(" ")[1]
@@ -10,7 +14,11 @@ export default function auth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: payload.id, email: payload.email, role: payload.role || "customer" };
+    req.user = {
+      id: payload.id,
+      email: payload.email != null ? String(payload.email) : undefined,
+      role: payload.role != null ? String(payload.role) : "customer"
+    };
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

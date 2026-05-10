@@ -53,7 +53,7 @@ function asBrandId(body) {
   return asText(body.brandId);
 }
 
-function mapRowToApiProduct(row) {
+function mapRowToApiProduct(row, extraImageUrls) {
   const rawCategory =
     row.category && typeof row.category === "object" && !Array.isArray(row.category)
       ? row.category
@@ -66,6 +66,11 @@ function mapRowToApiProduct(row) {
       : Array.isArray(row.brand_relation) && row.brand_relation[0]
         ? row.brand_relation[0]
         : null;
+  const fallbackSingle =
+    row.image_url || row.image ? [String(row.image_url ?? row.image)] : [];
+  const images =
+    Array.isArray(extraImageUrls) && extraImageUrls.length > 0 ? extraImageUrls : fallbackSingle;
+  const primary = images[0] ?? row.image ?? row.image_url ?? null;
   return {
     id: row.id,
     name: toLocalizedObject(row.name),
@@ -88,9 +93,37 @@ function mapRowToApiProduct(row) {
         }
       : null,
     brand_name: rawBrand?.name ?? null,
-    image: row.image ?? row.image_url ?? null,
-    image_url: row.image_url ?? row.image ?? null
+    image: primary,
+    image_url: primary,
+    images
   };
+}
+
+async function fetchProductImageUrls(supabase, productId) {
+  const res = await supabase
+    .from("product_images")
+    .select("url, image_url, sort_order")
+    .eq("product_id", productId);
+  if (res.error || !Array.isArray(res.data)) return [];
+  return [...res.data]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((r) => r.url || r.image_url)
+    .filter(Boolean);
+}
+
+async function persistProductImages(supabase, productId, urls) {
+  for (let i = 0; i < urls.length; i++) {
+    const row = { product_id: productId, url: urls[i], sort_order: i };
+    let ins = await supabase.from("product_images").insert(row);
+    if (ins.error) {
+      ins = await supabase.from("product_images").insert({
+        product_id: productId,
+        image_url: urls[i],
+        sort_order: i
+      });
+      if (ins.error) console.error("[products] product_images insert failed", ins.error);
+    }
+  }
 }
 
 export async function listProducts(req, res) {
@@ -106,7 +139,25 @@ export async function listProducts(req, res) {
     console.log("DB RESPONSE:", result.data);
     const products = Array.isArray(result.data) ? result.data : [];
     console.log("Fetched products:", products);
-    res.json(products);
+    const ids = products.map((p) => p.id).filter(Boolean);
+    const imagesByProduct = {};
+    if (ids.length) {
+      const imgRes = await supabase
+        .from("product_images")
+        .select("product_id, url, image_url, sort_order")
+        .in("product_id", ids);
+      if (!imgRes.error && Array.isArray(imgRes.data)) {
+        const sorted = [...imgRes.data].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        for (const row of sorted) {
+          const u = row.url || row.image_url;
+          if (!u) continue;
+          const pid = row.product_id;
+          if (!imagesByProduct[pid]) imagesByProduct[pid] = [];
+          imagesByProduct[pid].push(u);
+        }
+      }
+    }
+    res.json(products.map((p) => mapRowToApiProduct(p, imagesByProduct[p.id])));
   } catch (err) {
     console.error("[products.list] error", err);
     res.status(500).json({ error: "Server error" });
@@ -128,7 +179,8 @@ export async function getProductById(req, res) {
     console.log("DB RESPONSE:", result.data);
     if (!result.data) return res.status(404).json({ error: "Product not found" });
 
-    res.json(mapRowToApiProduct(result.data));
+    const extraUrls = await fetchProductImageUrls(supabase, id);
+    res.json(mapRowToApiProduct(result.data, extraUrls));
   } catch (err) {
     console.error("[products.getById] error", err);
     res.status(500).json({ error: "Server error" });
@@ -139,6 +191,9 @@ export async function createProduct(req, res) {
   const body = req.body ?? {};
   console.log("Incoming product:", req.body);
   console.log("Creating product:", req.body);
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+  const hostBase = `${req.protocol}://${req.get("host")}`;
+  const uploadedUrls = uploadedFiles.map((f) => `${hostBase}/uploads/products/${f.filename}`);
   const { name: rawName, description: rawDescription, price: rawPrice } = body;
   const name = toLocalizedObject(rawName);
   const description = toLocalizedObject(rawDescription);
@@ -146,6 +201,7 @@ export async function createProduct(req, res) {
   const categoryId = asCategoryId(body);
   const brandId = asBrandId(body);
   const imageUrl = asImageUrl(body);
+  const resolvedPrimaryImage = uploadedUrls[0] || imageUrl || null;
   const stockRaw = body.stock;
   const stockParsed = asNumber(stockRaw);
   const stock = Number.isFinite(stockParsed) ? Math.max(0, Math.trunc(stockParsed)) : 0;
@@ -203,7 +259,7 @@ export async function createProduct(req, res) {
     // Try API-contract columns first, then fallback to legacy schema keys.
     let insertPayload = {
       ...basePayload,
-      image_url: imageUrl || null
+      image_url: resolvedPrimaryImage || null
     };
     let attempt = await supabase.from("products").insert(insertPayload).select("*").single();
 
@@ -211,7 +267,7 @@ export async function createProduct(req, res) {
       console.error("[products.create] insert attempt #1 failed", attempt.error);
       insertPayload = {
         ...basePayload,
-        image: imageUrl || null
+        image: resolvedPrimaryImage || null
       };
       attempt = await supabase.from("products").insert(insertPayload).select("*").single();
     }
@@ -219,6 +275,10 @@ export async function createProduct(req, res) {
     if (attempt.error) {
       console.error("[products.create] insert failed", attempt.error);
       return res.status(500).json({ error: attempt.error.message || "Failed to create product" });
+    }
+
+    if (uploadedUrls.length) {
+      await persistProductImages(supabase, attempt.data.id, uploadedUrls);
     }
 
     const createdProduct = await supabase
@@ -234,7 +294,9 @@ export async function createProduct(req, res) {
     }
 
     console.log("DB RESPONSE:", createdProduct.data);
-    const product = mapRowToApiProduct(createdProduct.data);
+    let mergedUrls = uploadedUrls.length > 0 ? [...uploadedUrls] : [];
+    if (!mergedUrls.length && resolvedPrimaryImage) mergedUrls = [resolvedPrimaryImage];
+    const product = mapRowToApiProduct(createdProduct.data, mergedUrls);
     console.log("Created product:", product);
     return res.status(201).json(product);
   } catch (error) {
