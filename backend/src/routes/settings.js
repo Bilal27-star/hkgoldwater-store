@@ -1,8 +1,11 @@
 import { Router } from "express";
-import { getSettings, patchSettings } from "../controllers/settings.js";
+import { getSettings, patchSettings, getSocialMedia, patchSocialMedia } from "../controllers/settings.js";
+import adminJwtAuth from "../middleware/adminJwtAuth.js";
 
 const router = Router();
 
+router.get("/social", getSocialMedia);
+router.patch("/social", adminJwtAuth, patchSocialMedia);
 router.get("/", getSettings);
 router.patch("/", patchSettings);
 

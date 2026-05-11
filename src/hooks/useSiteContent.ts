@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getPages, getSettings } from "../api";
+import type { SocialMediaState } from "../admin/types/socialMedia";
+import { getPages, getSettings, getSocialMedia } from "../api";
 
 export type SiteSettingsData = {
   storeName: string;
@@ -29,17 +30,23 @@ const DEFAULT_SETTINGS: SiteSettingsData = {
 export function useSiteContent() {
   const [settings, setSettings] = useState<SiteSettingsData>(DEFAULT_SETTINGS);
   const [pages, setPages] = useState<SitePageData[]>([]);
+  const [socialMedia, setSocialMedia] = useState<SocialMediaState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [settingsData, pagesData] = await Promise.all([getSettings(), getPages()]);
+        const [settingsData, pagesData, socialData] = await Promise.all([
+          getSettings(),
+          getPages(),
+          getSocialMedia().catch(() => null)
+        ]);
         console.log("Settings loaded:", settingsData);
         console.log("Pages loaded:", pagesData);
         if (!cancelled) {
           setSettings({ ...DEFAULT_SETTINGS, ...(settingsData as Partial<SiteSettingsData>) });
           setPages(Array.isArray(pagesData) ? (pagesData as SitePageData[]) : []);
+          setSocialMedia(socialData && typeof socialData === "object" ? (socialData as SocialMediaState) : null);
         }
       } catch (error) {
         console.error("[site-content] load failed", error);
@@ -51,5 +58,5 @@ export function useSiteContent() {
     };
   }, []);
 
-  return { settings, pages };
+  return { settings, pages, socialMedia };
 }

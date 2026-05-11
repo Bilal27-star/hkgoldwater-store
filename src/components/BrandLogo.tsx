@@ -4,12 +4,12 @@ export type BrandLogoVariant = "header" | "auth" | "admin" | "adminAuth";
 
 const variantClass: Record<BrandLogoVariant, string> = {
   header:
-    "h-9 w-auto max-h-[42px] max-w-[min(200px,42vw)] sm:h-11 sm:max-h-[50px] sm:max-w-[220px]",
-  auth: "h-14 w-auto max-h-[60px] sm:h-[4.25rem] sm:max-h-[70px] max-w-[240px]",
+    "h-10 w-auto max-h-[46px] max-w-[min(220px,44vw)] sm:h-12 sm:max-h-[54px] sm:max-w-[240px]",
+  auth: "h-16 w-auto max-h-[68px] sm:h-[4.5rem] sm:max-h-[76px] max-w-[260px]",
   admin:
-    "h-8 w-auto max-h-[36px] max-w-[140px] sm:max-h-[40px] sm:max-w-[160px]",
+    "h-9 w-auto max-h-[40px] max-w-[152px] sm:max-h-[44px] sm:max-w-[172px]",
   adminAuth:
-    "mx-auto h-14 w-auto max-h-[56px] sm:h-16 sm:max-h-[68px] max-w-[200px]"
+    "mx-auto h-16 w-auto max-h-[62px] sm:h-[4.25rem] sm:max-h-[72px] max-w-[220px]"
 };
 
 type Props = {

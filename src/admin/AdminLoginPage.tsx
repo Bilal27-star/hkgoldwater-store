@@ -40,7 +40,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200/80">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex justify-center">
-          <img src={Logo} alt={"Logo "} className="h-10 w-auto mb-4 sm:mb-5" />
+          <img src={Logo} alt={"Logo "} className="h-12 w-auto mb-4 sm:h-14 sm:mb-5" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Admin Panel</h1>
           <p className="mt-1 text-sm text-slate-500">Sign in to manage your store</p>

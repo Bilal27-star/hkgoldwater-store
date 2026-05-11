@@ -17,6 +17,7 @@ type FeaturedProduct = {
   rating: number;
   reviewCount: number;
   price: number;
+  imageUrl: string;
 };
 
 function resolveLocalizedText(
@@ -69,7 +70,8 @@ export default function HomePage() {
             name: resolveLocalizedText(item.name || item.title, language) || "Product",
             rating,
             reviewCount,
-            price
+            price,
+            imageUrl: String(item.image || item.image_url || "").trim()
           };
         });
         if (!cancelled) {
@@ -85,7 +87,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +145,21 @@ export default function HomePage() {
                   role="link"
                   tabIndex={0}
                 >
-                  <div className={`product-image img-${i + 1}`} />
+                  <div
+                    className={
+                      product.imageUrl ? "product-image overflow-hidden bg-[#eef2f7]" : `product-image img-${i + 1}`
+                    }
+                  >
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt=""
+                        className="block h-full min-h-[292px] w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : null}
+                  </div>
                   <div className="product-body">
                     <h3>{product.name}</h3>
                     <p className="rating">⭐ {formatRating(product.rating, product.reviewCount)}</p>
@@ -166,11 +182,13 @@ export default function HomePage() {
       <section className="promo">
         <div className="container promo-inner">
           {/* <Logo variant="light" alt="" className="mx-auto mb-4 block sm:mb-5" /> */}
-          <img src={Logo} alt={"sasa"} className="h-10 w-auto mx-auto mb-4 block sm:mb-5" />
+          <img src={Logo} alt={"sasa"} className="h-12 w-auto mx-auto mb-4 block sm:h-14 sm:mb-5" />
           <span className="pill">{t("homePage.promoPill")}</span>
           <h3>{t("homePage.promoTitle")}</h3>
           <p>{t("homePage.promoText")}</p>
-          <button className="primary light">{t("homePage.promoCta")}</button>
+          <button type="button" className="primary light" onClick={() => navigate("/products")}>
+            {t("homePage.promoCta")}
+          </button>
         </div>
       </section>
 

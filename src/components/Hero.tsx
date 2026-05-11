@@ -1,9 +1,11 @@
 import { ShoppingCart } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import heroBackground from "../imports/Frame51135/f4725104622d6d9ee0bd761236b07bc5d4e5ffe9.png";
 import { useI18n } from "../i18n/I18nProvider";
 
 export default function Hero() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   return (
     <section
       id="home"
@@ -29,6 +31,7 @@ export default function Hero() {
           <div className="mt-6 pt-1">
             <button
               type="button"
+              onClick={() => navigate("/products")}
               className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-[#0B3D91] shadow-[0_14px_40px_-12px_rgba(0,0,0,0.35)] transition hover:bg-white/95 hover:shadow-[0_18px_44px_-14px_rgba(0,0,0,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
             >
               <ShoppingCart className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />

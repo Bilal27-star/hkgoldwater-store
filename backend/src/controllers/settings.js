@@ -9,6 +9,40 @@ const DEFAULT_SETTINGS = {
   footerText: ""
 };
 
+/** Matches storefront admin Social Media defaults — merged with DB jsonb. */
+const DEFAULT_SOCIAL_MEDIA = {
+  facebook: { enabled: true, value: "" },
+  instagram: { enabled: true, value: "" },
+  tiktok: { enabled: false, value: "" },
+  whatsapp: { enabled: true, value: "" }
+};
+
+const PLATFORM_IDS = ["facebook", "instagram", "tiktok", "whatsapp"];
+
+function cloneSocialDefaults() {
+  return JSON.parse(JSON.stringify(DEFAULT_SOCIAL_MEDIA));
+}
+
+function mergeSocialMedia(raw) {
+  const base = cloneSocialDefaults();
+  if (!raw || typeof raw !== "object") return base;
+  for (const id of PLATFORM_IDS) {
+    const entry = raw[id];
+    if (entry && typeof entry === "object") {
+      base[id] = {
+        enabled: Boolean(entry.enabled),
+        value: typeof entry.value === "string" ? entry.value.trim() : ""
+      };
+    }
+  }
+  return base;
+}
+
+function normalizeSocialBody(body) {
+  const merged = mergeSocialMedia(body);
+  return merged;
+}
+
 function mapSettingsRow(row) {
   if (!row) return { ...DEFAULT_SETTINGS };
   return {
@@ -34,6 +68,71 @@ export async function getSettings(req, res) {
     return res.json(mapSettingsRow(result.data));
   } catch (error) {
     console.error("[settings.get] error", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+}
+
+export async function getSocialMedia(req, res) {
+  try {
+    const supabase = req.app.locals.supabase;
+    const result = await supabase
+      .from("site_settings")
+      .select("social_media")
+      .eq("id", SETTINGS_ID)
+      .maybeSingle();
+
+    if (result.error) {
+      console.warn("[settings.social.get]", result.error.message || result.error);
+      return res.json(mergeSocialMedia(null));
+    }
+
+    return res.json(mergeSocialMedia(result.data?.social_media));
+  } catch (error) {
+    console.error("[settings.social.get] error", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+}
+
+export async function patchSocialMedia(req, res) {
+  try {
+    const normalized = normalizeSocialBody(req.body ?? {});
+    const supabase = req.app.locals.supabase;
+
+    const { data: existing, error: lookupErr } = await supabase
+      .from("site_settings")
+      .select("id")
+      .eq("id", SETTINGS_ID)
+      .maybeSingle();
+
+    if (lookupErr) throw lookupErr;
+
+    if (!existing) {
+      const insertPayload = {
+        id: SETTINGS_ID,
+        store_name: "",
+        email: "",
+        phone: "",
+        address: "",
+        logo: "",
+        footer_text: "",
+        social_media: normalized
+      };
+      const inserted = await supabase.from("site_settings").insert(insertPayload).select("social_media").single();
+      if (inserted.error) throw inserted.error;
+      return res.json(mergeSocialMedia(inserted.data?.social_media));
+    }
+
+    const updated = await supabase
+      .from("site_settings")
+      .update({ social_media: normalized })
+      .eq("id", SETTINGS_ID)
+      .select("social_media")
+      .single();
+
+    if (updated.error) throw updated.error;
+    return res.json(mergeSocialMedia(updated.data?.social_media));
+  } catch (error) {
+    console.error("[settings.social.patch] error", error);
     return res.status(500).json({ error: "Server error" });
   }
 }

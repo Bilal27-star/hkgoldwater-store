@@ -1,26 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { SOCIAL_MEDIA_DEFAULTS } from "../../constants/socialMediaDefaults";
+import { getSocialMedia, patchSocialMedia } from "../../api";
 import type { SocialMediaState, SocialPlatformId } from "../types/socialMedia";
 
 const STORAGE_KEY = "dz_social_media_v1";
 
-const INITIAL: SocialMediaState = {
-  facebook: {
-    enabled: true,
-    value: "https://www.facebook.com/HKGoldWater"
-  },
-  instagram: {
-    enabled: true,
-    value: "https://www.instagram.com/HKGoldWater"
-  },
-  tiktok: {
-    enabled: false,
-    value: ""
-  },
-  whatsapp: {
-    enabled: true,
-    value: "+213 555 123 456"
-  }
-};
+const INITIAL = SOCIAL_MEDIA_DEFAULTS;
 
 function load(): SocialMediaState | null {
   try {
@@ -50,6 +35,30 @@ export function useSocialMediaSettings() {
   const [draft, setDraft] = useState<SocialMediaState>(() => seeded ?? INITIAL);
   const [saved, setSaved] = useState<SocialMediaState>(() => seeded ?? INITIAL);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRemote() {
+      try {
+        const data = (await getSocialMedia()) as SocialMediaState | null;
+        if (cancelled || !data || typeof data !== "object") return;
+        const merged = { ...INITIAL, ...data };
+        setDraft(merged);
+        setSaved(merged);
+        persist(merged);
+      } catch {
+        const local = load();
+        if (!cancelled && local) {
+          setDraft(local);
+          setSaved(local);
+        }
+      }
+    }
+    loadRemote();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const isDirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
 
   const updatePlatform = useCallback((id: SocialPlatformId, patch: Partial<SocialMediaState[SocialPlatformId]>) => {
@@ -60,8 +69,7 @@ export function useSocialMediaSettings() {
   }, []);
 
   const flushSave = useCallback(async (): Promise<void> => {
-    // Future: await api.put("/settings/social-media", draft)
-    console.log("[SocialMedia] save", draft);
+    await patchSocialMedia(draft);
     setSaved(draft);
     persist(draft);
   }, [draft]);

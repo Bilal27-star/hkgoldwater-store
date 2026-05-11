@@ -20,6 +20,8 @@ export function getProductByIdApi(productId: string): Promise<any>;
 export function getCategories(): Promise<any>;
 export function getBrands(categoryId?: string): Promise<any>;
 export function getSettings(): Promise<any>;
+export function getSocialMedia(): Promise<any>;
+export function patchSocialMedia(payload: Record<string, { enabled: boolean; value: string }>): Promise<any>;
 export function patchSettings(payload: {
   storeName: string;
   email: string;

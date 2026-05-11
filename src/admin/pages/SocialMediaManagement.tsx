@@ -1,5 +1,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { getErrorMessage } from "../../api";
 import SocialCard from "../components/social-media/SocialCard";
 import SocialLivePreview from "../components/social-media/SocialLivePreview";
 import SocialQuickGuide from "../components/social-media/SocialQuickGuide";
@@ -7,7 +8,7 @@ import SocialSaveBar from "../components/social-media/SocialSaveBar";
 import { useSocialMediaSettings } from "../hooks/useSocialMediaSettings";
 import type { SocialPlatformId } from "../types/socialMedia";
 
-const PLATFORMS: SocialPlatformId[] = ["facebook", "instagram", "tiktok", "whatsapp"];
+const PLATFORMS: SocialPlatformId[] = ["facebook", "instagram", "whatsapp", "tiktok"];
 
 export default function SocialMediaManagement() {
   const { draft, isDirty, updatePlatform, flushSave } = useSocialMediaSettings();
@@ -18,6 +19,8 @@ export default function SocialMediaManagement() {
     try {
       await flushSave();
       toast.success("Social settings saved");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Could not save social settings"));
     } finally {
       setSaving(false);
     }

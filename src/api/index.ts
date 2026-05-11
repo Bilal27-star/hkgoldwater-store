@@ -282,6 +282,20 @@ export async function getSettings() {
   return request("/settings");
 }
 
+/** Public: social links for footer (from admin Social Media page). */
+export async function getSocialMedia() {
+  return request("/settings/social");
+}
+
+/** Admin-only: persist social links to site_settings.social_media */
+export async function patchSocialMedia(payload: Record<string, { enabled: boolean; value: string }>) {
+  return request("/settings/social", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    requireAuth: true
+  });
+}
+
 export async function patchSettings(payload: {
   storeName: string;
   email: string;

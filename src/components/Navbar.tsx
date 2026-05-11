@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Globe, Menu, ShoppingCart, User, X } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useSiteContent } from "../hooks/useSiteContent";
@@ -43,6 +43,8 @@ export default function Navbar() {
   const mobileDropdownRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
   const { pathname, hash } = useLocation();
+  const [searchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState("");
   const categories = STORE_CATEGORIES.map((category) => ({
     slug: category.slug,
     label: t(category.labelKey)
@@ -75,6 +77,20 @@ export default function Navbar() {
   }, [pathname, hash]);
 
   useEffect(() => {
+    if (pathname === "/products") {
+      setSearchInput(searchParams.get("search") || "");
+    } else {
+      setSearchInput("");
+    }
+  }, [pathname, searchParams]);
+
+  function submitProductSearch() {
+    const q = searchInput.trim();
+    navigate(q ? `/products?search=${encodeURIComponent(q)}` : "/products");
+    setMobileOpen(false);
+  }
+
+  useEffect(() => {
     console.log("navbar auth state", {
       isAuthenticated,
       hasToken: !!token,
@@ -98,7 +114,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-6 px-6 sm:h-16 sm:px-8 lg:px-12">
         <Link to="/" className="flex shrink-0 items-center p-0" aria-label={settings.storeName || t("common.home")}>
           {/* <Logo variant="gold" loading="eager" alt={settings.storeName || "HKGoldWater"} /> */}
-          <img src={Logo} alt={"sasa"} className="h-10 w-auto" />
+          <img src={Logo} alt={"sasa"} className="h-11 w-auto sm:h-12" />
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center gap-7 lg:flex" aria-label="Main">
@@ -184,6 +200,14 @@ export default function Navbar() {
         <div className="flex shrink-0 items-center justify-end gap-2.5 sm:gap-3">
           <input
             type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitProductSearch();
+              }
+            }}
             placeholder={t("common.searchProducts")}
             className="hidden h-12 w-[min(320px,36vw)] shrink rounded-[14px] border-2 border-[#e4ebf4] bg-[#f8fbff] px-3.5 text-sm text-[#1e2b3c] outline-none placeholder:text-[#6b7a8d] focus:border-[#1565C0] md:block"
             aria-label={t("common.searchProducts")}
@@ -355,6 +379,14 @@ export default function Navbar() {
           </nav>
           <input
             type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitProductSearch();
+              }
+            }}
             placeholder={t("common.searchProducts")}
             className="mt-4 h-12 w-full rounded-[14px] border-2 border-[#e4ebf4] bg-[#f8fbff] px-3.5 text-sm outline-none md:hidden"
             aria-label={t("common.searchProducts")}
