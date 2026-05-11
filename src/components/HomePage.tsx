@@ -6,8 +6,8 @@ import Categories from "./Categories";
 import Hero from "./Hero";
 import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
-import Logo from "./ui/Logo";
 
+import Logo from "../assets/logo.png";
 /** Order matches `homePage.trustItems` in locale files: delivery, payment, quality, support */
 const TRUST_ICONS: LucideIcon[] = [Truck, ShieldCheck, Award, Headphones];
 
@@ -165,7 +165,8 @@ export default function HomePage() {
 
       <section className="promo">
         <div className="container promo-inner">
-          <Logo variant="light" alt="" className="mx-auto mb-4 block sm:mb-5" />
+          {/* <Logo variant="light" alt="" className="mx-auto mb-4 block sm:mb-5" /> */}
+          <img src={Logo} alt={"sasa"} className="h-10 w-auto mx-auto mb-4 block sm:mb-5" />
           <span className="pill">{t("homePage.promoPill")}</span>
           <h3>{t("homePage.promoTitle")}</h3>
           <p>{t("homePage.promoText")}</p>

@@ -5,7 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useSiteContent } from "../hooks/useSiteContent";
 import { STORE_CATEGORIES } from "../constants/catalog";
-import Logo from "./ui/Logo";
+import Logo from "../assets/logo.png";
 import { useI18n } from "../i18n/I18nProvider";
 
 type NavItem = {
@@ -97,7 +97,8 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-[#0B3D91]/10 bg-white/95 shadow-[0_2px_12px_rgba(0,0,0,0.05)] backdrop-blur-sm">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-6 px-6 sm:h-16 sm:px-8 lg:px-12">
         <Link to="/" className="flex shrink-0 items-center p-0" aria-label={settings.storeName || t("common.home")}>
-          <Logo variant="gold" loading="eager" alt={settings.storeName || "HKGoldWater"} />
+          {/* <Logo variant="gold" loading="eager" alt={settings.storeName || "HKGoldWater"} /> */}
+          <img src={Logo} alt={"sasa"} className="h-10 w-auto" />
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center gap-7 lg:flex" aria-label="Main">

@@ -1,3 +1,5 @@
+import Logo from "../assets/logo.png";
+
 export type BrandLogoVariant = "header" | "auth" | "admin" | "adminAuth";
 
 const variantClass: Record<BrandLogoVariant, string> = {
@@ -21,7 +23,7 @@ export default function BrandLogo({ variant, className = "", alt = "Logo" }: Pro
   const loading = variant === "header" ? "eager" : "lazy";
   return (
     <img
-      src="/logo.png"
+      src={Logo}
       alt={alt}
       width={256}
       height={256}

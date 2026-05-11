@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n/I18nProvider";
 import { useSiteContent } from "../hooks/useSiteContent";
-import Logo from "./ui/Logo";
+
+import Logo from "../assets/logo.png";
 
 type Props = {
   /** e.g. `mt-16`, `mt-auto` — pages control vertical spacing */
@@ -22,9 +23,7 @@ export default function SiteFooter({ className = "" }: Props) {
     <footer className={`footer ${className}`.trim()} id="contact">
       <div className="container footer-top">
         <div>
-          <div className="mb-4 sm:mb-5">
-            <Logo variant="light" alt="" />
-          </div>
+          <img src={Logo} alt={"Logo"} className="h-10 w-auto mb-4 sm:mb-5" />
           <p>
             {settings.storeName || t("footer.description")}
           </p>

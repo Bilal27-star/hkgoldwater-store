@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Lock, Mail } from "lucide-react";
 import { useAdminAuth } from "./context/AdminAuthContext";
-import Logo from "../components/ui/Logo";
+import Logo from '../assets/logo.png'
 
 export default function AdminLoginPage() {
   const { login, isAuthenticated, isReady } = useAdminAuth();
@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const result = await login(email, password);
+    const result = await login(email.trim(), password.trim());
     setSubmitting(false);
     if (result.ok) {
       toast.success("Signed in successfully");
@@ -40,12 +40,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200/80">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex justify-center">
-            <Logo
-              variant="dark"
-              alt=""
-              useDefaultSize={false}
-              className="h-14 w-auto max-h-[56px] object-contain sm:h-16 sm:max-h-[64px]"
-            />
+          <img src={Logo} alt={"Logo "} className="h-10 w-auto mb-4 sm:mb-5" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Admin Panel</h1>
           <p className="mt-1 text-sm text-slate-500">Sign in to manage your store</p>
