@@ -56,72 +56,86 @@ console.log("[startup] admin-login env (booleans only, no secrets)", {
   JWT_SECRET: Boolean(process.env.JWT_SECRET),
   SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
   SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  DISABLE_ADMIN_BOOTSTRAP: String(process.env.DISABLE_ADMIN_BOOTSTRAP || "").trim() === "1",
   ADMIN_SEED_EMAIL: Boolean(String(process.env.ADMIN_SEED_EMAIL || "").trim()),
   ADMIN_SEED_PASSWORD: Boolean(String(process.env.ADMIN_SEED_PASSWORD || "").trim()),
   ADMIN_SYNC_TOKEN: Boolean(String(process.env.ADMIN_SYNC_TOKEN || "").trim()),
-  NODE_ENV: process.env.NODE_ENV || "(unset)"
+  NODE_ENV: process.env.NODE_ENV || "(unset)",
+  note: "Boot sync uses ADMIN_SEED_* or defaults admin@new.com / admin123! unless DISABLE_ADMIN_BOOTSTRAP=1"
 });
 
 /**
- * Optional: set ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD in the API environment.
- * On each boot, upserts bcrypt `password_hash` for that email in `admins` (same DB as SUPABASE_URL).
- * Use this on production hosts (e.g. Render) whenever the deploy uses a different Supabase project than
- * your laptop, or keep the vars set so redeploys repair the admin password.
+ * On every boot: upsert bcrypt `password_hash` for the bootstrap admin (same defaults as
+ * `scripts/ensure-admin.mjs`). **Must finish before `app.listen`** so the first login is not a race.
+ *
+ * Defaults: admin@new.com / admin123! — override with ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD.
+ * Opt out entirely: DISABLE_ADMIN_BOOTSTRAP=1
  */
-(async () => {
-  const email = process.env.ADMIN_SEED_EMAIL?.trim().toLowerCase();
-  const plain = process.env.ADMIN_SEED_PASSWORD;
-  if (!email || !plain) {
-    if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "[admin-seed] skipped (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD not both set). " +
-          "Admin login only works if `admins` already has a valid row for that Supabase project. " +
-          "Set both on your host and redeploy to create or fix the password hash."
-      );
-    }
+async function runAdminBootstrap(supabase) {
+  if (String(process.env.DISABLE_ADMIN_BOOTSTRAP || "").trim() === "1") {
+    console.log("[admin-seed] skipped (DISABLE_ADMIN_BOOTSTRAP=1)");
     return;
   }
 
-  try {
-    const supabase = app.locals.supabase;
-    const hash = await bcrypt.hash(String(plain), 10);
-    const { data: existing, error: e1 } = await supabase.from("admins").select("id").eq("email", email).maybeSingle();
-    if (e1) {
-      console.error("[admin-seed] lookup error:", e1.message);
-      return;
-    }
-    if (existing?.id) {
-      const { error: e2 } = await supabase.from("admins").update({ password_hash: hash }).eq("id", existing.id);
-      if (e2) console.error("[admin-seed] update error:", e2.message);
-      else console.log("[admin-seed] password hash synced for", email);
-      return;
-    }
-    const { error: e3 } = await supabase.from("admins").insert({
-      name: "Admin",
-      email,
-      role: "admin",
-      password_hash: hash
-    });
-    if (e3) console.error("[admin-seed] insert error:", e3.message);
-    else console.log("[admin-seed] admin row created for", email);
-  } catch (err) {
-    console.error("[admin-seed] failed:", err);
+  const email = (process.env.ADMIN_SEED_EMAIL || "admin@new.com").trim().toLowerCase();
+  const plain = process.env.ADMIN_SEED_PASSWORD || "admin123!";
+
+  console.log(
+    "[admin-seed] bootstrap",
+    email,
+    process.env.ADMIN_SEED_PASSWORD ? "(password from ADMIN_SEED_PASSWORD)" : "(default password; override env recommended for production)"
+  );
+
+  const hash = await bcrypt.hash(String(plain), 10);
+  const { data: existing, error: e1 } = await supabase.from("admins").select("id").eq("email", email).maybeSingle();
+  if (e1) {
+    console.error("[admin-seed] lookup error:", e1.message);
+    throw e1;
   }
-})();
+  if (existing?.id) {
+    const { error: e2 } = await supabase.from("admins").update({ password_hash: hash }).eq("id", existing.id);
+    if (e2) {
+      console.error("[admin-seed] update error:", e2.message);
+      throw e2;
+    }
+    console.log("[admin-seed] password hash synced for", email);
+    return;
+  }
+  const { error: e3 } = await supabase.from("admins").insert({
+    name: "Admin",
+    email,
+    role: "admin",
+    password_hash: hash
+  });
+  if (e3) {
+    console.error("[admin-seed] insert error:", e3.message);
+    throw e3;
+  }
+  console.log("[admin-seed] admin row created for", email);
+}
 
-// 🔍 Test Supabase connection on boot
-(async () => {
+async function runCategoriesSmokeTest(supabase) {
   try {
-    const { data, error } = await app.locals.supabase
-      .from("categories")
-      .select("*");
-
-    console.log("🧪 TEST categories:", data);
+    const { data, error } = await supabase.from("categories").select("*").limit(5);
+    console.log("🧪 TEST categories (sample):", Array.isArray(data) ? `${data.length} row(s)` : data);
     if (error) console.error("❌ TEST ERROR:", error);
   } catch (err) {
     console.error("❌ SUPABASE INIT ERROR:", err);
   }
-})();
+}
+
+try {
+  await runAdminBootstrap(app.locals.supabase);
+} catch (startupDataErr) {
+  console.error("[startup] admin bootstrap failed (login may fail until fixed):", startupDataErr);
+}
+
+{
+  const { error: admProbe } = await app.locals.supabase.from("admins").select("id").limit(1);
+  console.log("[startup] public.admins probe:", admProbe ? `error: ${admProbe.message}` : "ok (service role can read)");
+}
+
+await runCategoriesSmokeTest(app.locals.supabase);
 
 app.use(
   cors({
