@@ -44,6 +44,13 @@ export default function AdminLoginPage() {
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Admin Panel</h1>
           <p className="mt-1 text-sm text-slate-500">Sign in to manage your store</p>
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-left text-xs leading-relaxed text-slate-600 ring-1 ring-slate-100">
+            Uses the <strong className="font-medium text-slate-800">public.admins</strong> table (bcrypt{" "}
+            <code className="rounded bg-slate-100 px-1">password_hash</code>), not Supabase{" "}
+            <strong className="font-medium text-slate-800">Authentication → Users</strong>. If login always fails,
+            your API host may be pointed at a different Supabase project than the one you edit in the dashboard—align{" "}
+            <code className="rounded bg-slate-100 px-1">SUPABASE_URL</code> / service role on Render with that project.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

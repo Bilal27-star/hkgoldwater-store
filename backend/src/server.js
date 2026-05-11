@@ -45,14 +45,42 @@ app.locals.supabase = createClient(
   }
 );
 
+try {
+  const host = new URL(process.env.SUPABASE_URL).hostname;
+  console.log(`[startup] Supabase: ${host}`);
+} catch {
+  /* ignore */
+}
+
+console.log("[startup] admin-login env (booleans only, no secrets)", {
+  JWT_SECRET: Boolean(process.env.JWT_SECRET),
+  SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  ADMIN_SEED_EMAIL: Boolean(String(process.env.ADMIN_SEED_EMAIL || "").trim()),
+  ADMIN_SEED_PASSWORD: Boolean(String(process.env.ADMIN_SEED_PASSWORD || "").trim()),
+  ADMIN_SYNC_TOKEN: Boolean(String(process.env.ADMIN_SYNC_TOKEN || "").trim()),
+  NODE_ENV: process.env.NODE_ENV || "(unset)"
+});
+
 /**
- * Optional: set ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD in .env, restart API once.
- * Upserts bcrypt hash so admin login works (no UI change). Remove vars after first login in production.
+ * Optional: set ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD in the API environment.
+ * On each boot, upserts bcrypt `password_hash` for that email in `admins` (same DB as SUPABASE_URL).
+ * Use this on production hosts (e.g. Render) whenever the deploy uses a different Supabase project than
+ * your laptop, or keep the vars set so redeploys repair the admin password.
  */
 (async () => {
   const email = process.env.ADMIN_SEED_EMAIL?.trim().toLowerCase();
   const plain = process.env.ADMIN_SEED_PASSWORD;
-  if (!email || !plain) return;
+  if (!email || !plain) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "[admin-seed] skipped (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD not both set). " +
+          "Admin login only works if `admins` already has a valid row for that Supabase project. " +
+          "Set both on your host and redeploy to create or fix the password hash."
+      );
+    }
+    return;
+  }
 
   try {
     const supabase = app.locals.supabase;
@@ -114,7 +142,18 @@ app.use((req, _res, next) => {
 
 app.get("/api/health", (_req, res) => {
   console.log("[route-hit] GET /api/health");
-  res.json({ status: "ok" });
+  let supabaseHost = null;
+  try {
+    supabaseHost = new URL(process.env.SUPABASE_URL).hostname;
+  } catch {
+    /* ignore */
+  }
+  res.json({
+    status: "ok",
+    ...(supabaseHost ? { supabaseHost } : {}),
+    /** Matches POST /api/admin/login: `public.admins` + bcrypt, not Supabase Auth. */
+    adminAuthMode: "public_admins_bcrypt"
+  });
 });
 
 app.use("/api/categories", categoryRoutes);

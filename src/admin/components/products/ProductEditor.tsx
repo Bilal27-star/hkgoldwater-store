@@ -70,9 +70,13 @@ export default function ProductEditor({
 
 
   useEffect(() => {
-    if (!initialProduct && categories.length > 0) {
-      setCategoryId((prev) => prev || categories[0]?.id || "");
-    }
+    if (initialProduct) return;
+    if (categories.length === 0) return;
+    const ids = new Set(categories.map((c) => c.id));
+    setCategoryId((prev) => {
+      if (prev && ids.has(prev)) return prev;
+      return categories[0]?.id || "";
+    });
   }, [categories, initialProduct]);
 
   useEffect(() => {

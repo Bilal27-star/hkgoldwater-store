@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development node --watch src/server.js",
-    "start": "node src/server.js",
+    "start": "node scripts/ensure-admin.mjs && node src/server.js",
     "seed:admin": "node scripts/ensure-admin.mjs",
-    "set:admin-password": "node scripts/set-admin-password.mjs"
+    "set:admin-password": "node scripts/set-admin-password.mjs",
+    "reset:admin-password-once": "node scripts/reset-admin-password-once.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.10",

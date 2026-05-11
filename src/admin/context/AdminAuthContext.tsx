@@ -55,6 +55,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
+      setToken(null);
       const normalizedEmail = email.trim().toLowerCase();
       const payload = (await adminLoginApi({
         email: normalizedEmail,

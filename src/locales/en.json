@@ -63,6 +63,7 @@
   },
   "categories": {
     "title": "Shop by Category",
+    "subtitle": "Curated ranges for sanitary, plumbing, and pool projects.",
     "items": [
       { "name": "Sanitary Accessories", "subtitle": "Premium accessories for modern sanitary spaces" },
       { "name": "Plumbing & Heating", "subtitle": "Reliable plumbing and heating essentials" },

@@ -14,6 +14,7 @@ import {
   getProductsApi,
   getToken
 } from "../../api";
+import { useI18n } from "../../i18n/I18nProvider";
 import { ADMIN_DATA_STORAGE_KEY } from "../constants";
 import {
   defaultSettings,
@@ -83,17 +84,21 @@ type AdminDataContextValue = {
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
+  const { language } = useI18n();
   const [store, setStore] = useState<AdminStore>(() => loadStore());
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
 
-  const resolveLocalizedText = useCallback((value: unknown) => {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const record = value as Record<string, unknown>;
-      return String(record.en || record.fr || record.ar || "");
-    }
-    return String(value || "");
-  }, []);
+  const resolveLocalizedText = useCallback(
+    (value: unknown) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const record = value as Record<string, unknown>;
+        return String(record[language] ?? record.en ?? record.fr ?? record.ar ?? "");
+      }
+      return String(value || "");
+    },
+    [language]
+  );
 
   const mapApiProductToAdminProduct = useCallback(
     (item: any): AdminProduct => ({
@@ -119,17 +124,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const mapApiCategoryToAdminCategory = useCallback(
     (item: any): AdminCategory => ({
       id: String(item.id),
-      name: item.name || "Category",
+      name: resolveLocalizedText(item.name) || "Category",
       slug:
         typeof item.slug === "string" && item.slug.trim()
           ? item.slug.trim()
-          : String(item.name || "category")
+          : (resolveLocalizedText(item.name) || "category")
               .toLowerCase()
               .trim()
               .replace(/\s+/g, "-")
               .replace(/[^a-z0-9-]/g, "")
     }),
-    []
+    [resolveLocalizedText]
   );
 
   useEffect(() => {

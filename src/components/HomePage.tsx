@@ -1,7 +1,7 @@
 import { Award, Headphones, ShieldCheck, ShoppingCart, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCategories, getProducts } from "../api";
+import { getProducts } from "../api";
 import Categories from "./Categories";
 import Hero from "./Hero";
 import SiteFooter from "./SiteFooter";
@@ -36,7 +36,6 @@ export default function HomePage() {
   const navigate = useNavigate();
   const trustItems = list<{ title: string; desc: string }>("homePage.trustItems");
   const [products, setProducts] = useState<FeaturedProduct[]>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const renderCountRef = useRef(0);
 
   renderCountRef.current += 1;
@@ -89,27 +88,6 @@ export default function HomePage() {
     };
   }, [language]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCategories() {
-      try {
-        const data = await getCategories();
-        const rows = Array.isArray(data) ? data : [];
-        if (!cancelled) {
-          const mapped = rows.map((row: any) => ({ id: String(row.id), name: String(row.name || "") }));
-          setCategories(mapped);
-          console.log("CATEGORIES:", mapped);
-        }
-      } catch {
-        if (!cancelled) setCategories([]);
-      }
-    }
-    loadCategories();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   function formatDa(value: number) {
     return `${value.toLocaleString("fr-DZ")} DA`;
   }
@@ -122,7 +100,7 @@ export default function HomePage() {
     <>
       <Hero />
 
-      <Categories categories={categories} />
+      <Categories />
 
       <section className="featured" id="products">
         <div className="container">

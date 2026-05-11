@@ -63,6 +63,7 @@
   },
   "categories": {
     "title": "Acheter par catégorie",
+    "subtitle": "Sélections pour sanitaire, plomberie et accessoires piscine.",
     "items": [
       { "name": "Accessoires sanitaires", "subtitle": "Accessoires premium pour espaces sanitaires modernes" },
       { "name": "Plomberie et chauffage", "subtitle": "Essentiels fiables pour plomberie et chauffage" },

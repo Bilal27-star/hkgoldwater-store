@@ -1,8 +1,53 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function supabaseProjectHost() {
+  try {
+    return new URL(process.env.SUPABASE_URL || "about:blank").hostname;
+  } catch {
+    return "(invalid SUPABASE_URL)";
+  }
+}
+
+/** Structured logs for Render/production (no plaintext password, no full bcrypt hash). */
+function adminLoginLog(reqId, step, payload) {
+  console.log(
+    JSON.stringify({
+      component: "admin.login",
+      reqId,
+      step,
+      ts: new Date().toISOString(),
+      ...payload
+    })
+  );
+}
+
+function describeStoredPasswordHash(hash) {
+  if (hash == null || hash === "") {
+    return { present: false, kind: "empty", length: 0, prefix: null };
+  }
+  const s = String(hash).trim();
+  const looksBcrypt = /^\$2[aby]\$\d{2}\$/.test(s) && s.length >= 59;
+  return {
+    present: true,
+    kind: looksBcrypt ? "bcrypt" : "non_bcrypt_or_truncated",
+    length: s.length,
+    prefix: looksBcrypt ? `${s.slice(0, 7)}…` : "(not bcrypt shape)"
+  };
+}
+
+function bcryptRoundsSafe(hash) {
+  if (!hash || typeof hash !== "string") return null;
+  try {
+    return bcrypt.getRounds(hash.trim());
+  } catch {
+    return null;
+  }
 }
 
 /** Escape `%`, `_`, `\` for ILIKE so emails match literally (case-insensitive). */
@@ -179,22 +224,37 @@ export async function syncAdminCredentials(req, res) {
 const UNAUTHORIZED = { error: "Invalid email or password" };
 
 /**
- * POST /api/admin/login → mounted as POST /api/admin/login (see routes/admin.js + server.js).
- * Uses `bcrypt` (already in package.json). Peer API matches `bcryptjs` at runtime.
+ * POST /api/admin/login — custom auth only:
+ * - Reads `public.admins` via Supabase **service role** (PostgREST). **Supabase Auth (GoTrue) is not used.**
+ * - Verifies password with **bcrypt.compare** against `password_hash`.
+ * - Emits structured JSON logs (see `adminLoginLog`) — never logs plaintext password or full hash.
  */
 export async function loginAdmin(req, res) {
+  const reqId = crypto.randomUUID ? crypto.randomUUID() : `login-${Date.now()}`;
   const email = asText(req.body?.email).toLowerCase();
   const password = asText(req.body?.password);
 
-  console.log("EMAIL:", email);
-  console.log("INPUT PASSWORD:", password);
+  adminLoginLog(reqId, "request_received", {
+    authMode: "custom_public_admins_table",
+    supabaseAuthGoTrue: "not_invoked_admin_uses_service_role_postgrest_only",
+    supabaseProjectHost: supabaseProjectHost(),
+    incomingEmail: email || "(empty)",
+    providedPasswordLength: password.length,
+    productionEnvHints: {
+      JWT_SECRET: Boolean(process.env.JWT_SECRET),
+      SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+      SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    }
+  });
 
   if (!email || !password) {
+    adminLoginLog(reqId, "validation_failed", { reason: "missing_email_or_password" });
     return res.status(400).json({ error: "email and password are required" });
   }
 
   const SECRET = process.env.JWT_SECRET;
   if (!SECRET) {
+    adminLoginLog(reqId, "config_error", { reason: "JWT_SECRET_missing" });
     console.error("[admin.login] JWT_SECRET is not set");
     return res.status(500).json({ error: "JWT_SECRET is not configured" });
   }
@@ -204,29 +264,72 @@ export async function loginAdmin(req, res) {
     const { user, error: lookupError } = await fetchUserForAdminLogin(supabase, email);
 
     if (lookupError) {
+      adminLoginLog(reqId, "admin_lookup_error", {
+        incomingEmail: email,
+        postgrestError: {
+          message: lookupError.message || String(lookupError),
+          code: lookupError.code ?? null,
+          details: lookupError.details ?? null,
+          hint: lookupError.hint ?? null
+        }
+      });
       console.error("[admin.login] Supabase lookup error:", lookupError.message || lookupError);
       throw lookupError;
     }
 
-    console.log("USER FROM DB:", user);
-    console.log("HASH:", user?.password_hash);
+    adminLoginLog(reqId, "admin_lookup_result", {
+      incomingEmail: email,
+      rowFound: Boolean(user),
+      adminId: user?.id ?? null,
+      rowEmail: user?.email ?? null,
+      role: user?.role ?? null,
+      storedPasswordHash: describeStoredPasswordHash(user?.password_hash)
+    });
 
-    if (!user || !user.password_hash) {
-      console.log("COMPARE RESULT:", "(skipped — missing user or password_hash)");
+    if (!user) {
+      adminLoginLog(reqId, "auth_failed", { reason: "no_admin_row_for_email", httpStatus: 401 });
       return res.status(401).json(UNAUTHORIZED);
     }
 
-    const isValid = await bcrypt.compare(password, user.password_hash);
-    console.log("COMPARE RESULT:", isValid);
+    const storedHash = user.password_hash != null ? String(user.password_hash).trim() : "";
+    if (!storedHash) {
+      adminLoginLog(reqId, "auth_blocked", { reason: "password_hash_empty_on_row", adminId: user.id, httpStatus: 403 });
+      return res.status(403).json({
+        error:
+          "This admin row has no password_hash. Set it in Table Editor → public.admins, or run API seed (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD on the host), or POST /api/admin/sync-credentials."
+      });
+    }
+
+    let isValid = false;
+    let compareThrown = null;
+    try {
+      isValid = await bcrypt.compare(password, storedHash);
+    } catch (compareErr) {
+      compareThrown = compareErr instanceof Error ? compareErr.message : String(compareErr);
+    }
+
+    adminLoginLog(reqId, "password_compare_result", {
+      incomingEmail: email,
+      adminId: user.id,
+      bcryptCompareResult: isValid,
+      compareThrew: compareThrown != null,
+      compareError: compareThrown,
+      storedHashKind: describeStoredPasswordHash(storedHash).kind,
+      storedHashLength: storedHash.length,
+      bcryptRounds: bcryptRoundsSafe(storedHash)
+    });
 
     if (!isValid) {
+      adminLoginLog(reqId, "auth_failed", { reason: "bcrypt_mismatch_or_invalid_hash", httpStatus: 401 });
       return res.status(401).json(UNAUTHORIZED);
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: "7d" });
+    adminLoginLog(reqId, "auth_success", { adminId: user.id, role: user.role, httpStatus: 200 });
     return res.json({ token });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to login admin";
+    adminLoginLog(reqId, "server_error", { message });
     console.error("[admin.login]", message);
     return res.status(500).json({ error: message });
   }

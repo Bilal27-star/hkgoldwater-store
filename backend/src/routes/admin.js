@@ -9,9 +9,10 @@ import {
 
 const router = Router();
 
-router.get("/", listAdmins);
-router.post("/sync-credentials", syncAdminCredentials);
+/** Register explicit paths before `/` so `/login` is never ambiguous. */
 router.post("/login", loginAdmin);
+router.post("/sync-credentials", syncAdminCredentials);
+router.get("/", listAdmins);
 router.post("/", createAdmin);
 router.delete("/:id", deleteAdmin);
 

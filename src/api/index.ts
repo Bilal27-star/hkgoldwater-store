@@ -91,7 +91,12 @@ export function isAdminJwtToken(token: string): boolean {
   return role === "admin" || role === "main_admin" || role === "superadmin";
 }
 
-type ApiRequestOptions = RequestInit & { headers?: HeadersInit; requireAuth?: boolean };
+type ApiRequestOptions = RequestInit & {
+  headers?: HeadersInit;
+  requireAuth?: boolean;
+  /** Omit Authorization — use for public catalog GETs so a stale customer JWT cannot break reads. */
+  skipAuth?: boolean;
+};
 
 function headersInitToRecord(h: HeadersInit | undefined): Record<string, string> {
   if (!h) return {};
@@ -121,6 +126,19 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   } catch {
     return null;
   }
+}
+
+/** Coerce list endpoints to a plain array (`[]`, `{ data: [] }`, `{ items: [] }`, etc.). */
+export function unwrapEntityArray(data: unknown): any[] {
+  if (Array.isArray(data)) return data;
+  if (data != null && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const key of ["data", "items", "categories", "brands", "results"] as const) {
+      const v = o[key];
+      if (Array.isArray(v)) return v;
+    }
+  }
+  return [];
 }
 
 function resolveApiError(response: Response, payload: unknown): Error {
@@ -191,8 +209,8 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
 }
 
 async function request(path: string, options: ApiRequestOptions = {}) {
-  const { requireAuth, ...fetchInit } = options;
-  const token = getBearerJwt();
+  const { requireAuth, skipAuth, ...fetchInit } = options;
+  const token = skipAuth ? null : getBearerJwt();
 
   const isFormData =
     typeof FormData !== "undefined" && fetchInit.body instanceof FormData;
@@ -212,7 +230,7 @@ async function request(path: string, options: ApiRequestOptions = {}) {
   }
 
   const customHeaders = headersInitToRecord(fetchInit.headers);
-  const authHeaders = getAuthHeaders();
+  const authHeaders = skipAuth ? {} : getAuthHeaders();
 
   const headers: Record<string, string> = {
     ...customHeaders,
@@ -257,25 +275,27 @@ export async function getProducts(params: Record<string, string | number | undef
     }
   });
   const qs = search.toString();
-  return request(`/products${qs ? `?${qs}` : ""}`);
+  return request(`/products${qs ? `?${qs}` : ""}`, { skipAuth: true });
 }
 
 export async function getProductByIdApi(productId: string) {
   const id = String(productId || "").trim();
   if (!id) throw new Error("Product id is required");
-  return request(`/products/${encodeURIComponent(id)}`);
+  return request(`/products/${encodeURIComponent(id)}`, { skipAuth: true });
 }
 
-export async function getCategories() {
-  return request("/categories");
+export async function getCategories(): Promise<any[]> {
+  const data = await request("/categories", { skipAuth: true });
+  return unwrapEntityArray(data);
 }
 
-export async function getBrands(categoryId?: string) {
+export async function getBrands(categoryId?: string): Promise<any[]> {
   const normalizedCategoryId = String(categoryId || "").trim();
-  if (!normalizedCategoryId) {
-    return request("/brands");
-  }
-  return request(`/brands?category_id=${encodeURIComponent(normalizedCategoryId)}`);
+  const path = normalizedCategoryId
+    ? `/brands?category_id=${encodeURIComponent(normalizedCategoryId)}`
+    : "/brands";
+  const data = await request(path, { skipAuth: true });
+  return unwrapEntityArray(data);
 }
 
 export async function getSettings() {
@@ -496,7 +516,9 @@ export async function logoutApi() {
 export async function adminLoginApi(payload: { email: string; password: string }) {
   const body = await request("/admin/login", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    /** Never send a stale shop/customer Bearer token — it confuses debugging and some proxies. */
+    skipAuth: true
   });
 
   console.log("[adminLoginApi] FULL RESPONSE", body);
