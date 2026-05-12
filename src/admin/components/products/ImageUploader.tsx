@@ -7,6 +7,36 @@ const DEBUG = "[ImageUploader]";
 const DEFAULT_MAX_MB = 2;
 const DEFAULT_MAX_FILES = 4;
 
+/** Library picks (esp. iOS) often use empty type or octet-stream; still real image files. */
+const IMAGE_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".bmp",
+  ".heic",
+  ".heif",
+  ".avif",
+  ".tif",
+  ".tiff"
+]);
+
+function fileExtensionLower(name: string): string {
+  const n = (name || "").toLowerCase();
+  const i = n.lastIndexOf(".");
+  return i >= 0 ? n.slice(i) : "";
+}
+
+function isLikelyImageFile(file: File): boolean {
+  const t = (file.type || "").trim().toLowerCase();
+  if (t.startsWith("image/")) return true;
+  const ext = fileExtensionLower(file.name);
+  if (ext && IMAGE_EXTENSIONS.has(ext)) return true;
+  if (t === "application/octet-stream" && ext && IMAGE_EXTENSIONS.has(ext)) return true;
+  return false;
+}
+
 type Props = {
   onChange: (files: File[]) => void;
   existingImageUrl?: string;
@@ -43,7 +73,7 @@ export default function ImageUploader({
   function validateAndCollect(raw: File[]): File[] {
     const out: File[] = [];
     for (const file of raw) {
-      if (!file.type.startsWith("image/")) {
+      if (!isLikelyImageFile(file)) {
         toast.error("Please choose image files only.");
         console.warn(DEBUG, "rejected non-image", file.name, file.type);
         return [];
@@ -153,7 +183,7 @@ export default function ImageUploader({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+          accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif,image/*"
           multiple
           disabled={disabled}
           tabIndex={-1}
@@ -174,7 +204,7 @@ export default function ImageUploader({
                   src={src}
                   alt=""
                   className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
-                  onError={onProductImageError}
+                  onError={src.startsWith("blob:") ? undefined : onProductImageError}
                 />
               ))}
             </div>
