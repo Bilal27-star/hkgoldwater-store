@@ -326,6 +326,157 @@ export async function createProduct(req, res) {
   }
 }
 
+export async function updateProduct(req, res) {
+  const id = String(req.params.id || "").trim();
+  if (!id) return res.status(400).json({ error: "Product id is required" });
+
+  const body = req.body ?? {};
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+  const supabaseBase = process.env.SUPABASE_URL || "";
+  const { name: rawName, description: rawDescription, price: rawPrice } = body;
+  const name = toLocalizedObject(rawName);
+  const description = toLocalizedObject(rawDescription ?? "");
+  const price = asNumber(rawPrice);
+  const categoryId = asCategoryId(body);
+  const brandId = asBrandId(body);
+  const stockRaw = body.stock;
+  const stockParsed = asNumber(stockRaw);
+  const stock = Number.isFinite(stockParsed) ? Math.max(0, Math.trunc(stockParsed)) : 0;
+
+  if (!asText(name.en) && !asText(name.fr) && !asText(name.ar)) {
+    return res.status(400).json({ error: "name is required" });
+  }
+  if (!Number.isFinite(price)) {
+    return res.status(400).json({ error: "price is required and must be numeric" });
+  }
+  if (!categoryId) {
+    return res.status(400).json({ error: "category_id is required" });
+  }
+
+  try {
+    const supabase = req.app.locals.supabase;
+
+    const existing = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (!existing.data) return res.status(404).json({ error: "Product not found" });
+
+    const currentPrimary =
+      existing.data.image_url != null && String(existing.data.image_url).trim() !== ""
+        ? String(existing.data.image_url).trim()
+        : existing.data.image != null && String(existing.data.image).trim() !== ""
+          ? String(existing.data.image).trim()
+          : null;
+
+    const categoryCheck = await supabase
+      .from("categories")
+      .select("id")
+      .eq("id", categoryId)
+      .maybeSingle();
+    if (categoryCheck.error) throw categoryCheck.error;
+    if (!categoryCheck.data) {
+      return res.status(400).json({ error: "Invalid category_id" });
+    }
+
+    let resolvedBrandId = null;
+    if (brandId) {
+      const brandCheck = await supabase
+        .from("brands")
+        .select("id,name,category_id")
+        .eq("id", brandId)
+        .maybeSingle();
+      if (brandCheck.error) throw brandCheck.error;
+      if (!brandCheck.data) {
+        return res.status(400).json({ error: "Invalid brand_id" });
+      }
+      if (brandCheck.data.category_id !== categoryId) {
+        return res.status(400).json({ error: "brand_id does not belong to selected category" });
+      }
+      resolvedBrandId = brandCheck.data.id;
+    }
+
+    let storagePaths = [];
+    if (uploadedFiles.length) {
+      try {
+        storagePaths = await uploadProductFilesToStorage(supabase, uploadedFiles);
+      } catch (uploadErr) {
+        console.error("[products.update] storage upload failed", uploadErr);
+        const message =
+          uploadErr instanceof Error ? uploadErr.message : "Product image upload failed";
+        return res.status(500).json({ error: message });
+      }
+    }
+
+    const imageUrlRaw = asImageUrl(body);
+    const normalizedBodyImage = normalizeImageRefForDb(imageUrlRaw, supabaseBase);
+    let resolvedPrimaryImage = currentPrimary;
+    if (storagePaths.length > 0) {
+      resolvedPrimaryImage = storagePaths[0];
+    } else if (normalizedBodyImage) {
+      resolvedPrimaryImage = normalizedBodyImage;
+    }
+
+    const basePayload = {
+      name,
+      description,
+      price,
+      stock,
+      category_id: categoryId,
+      brand_id: resolvedBrandId,
+      brand: null
+    };
+
+    const relationSelect =
+      "*, category:categories(id,name), brand_relation:brands(id,name,category_id)";
+
+    let updatePayload = {
+      ...basePayload,
+      image_url: resolvedPrimaryImage || null
+    };
+    let attempt = await supabase
+      .from("products")
+      .update(updatePayload)
+      .eq("id", id)
+      .select(relationSelect)
+      .maybeSingle();
+
+    if (attempt.error) {
+      console.error("[products.update] update attempt #1 failed", attempt.error);
+      updatePayload = {
+        ...basePayload,
+        image: resolvedPrimaryImage || null
+      };
+      attempt = await supabase
+        .from("products")
+        .update(updatePayload)
+        .eq("id", id)
+        .select(relationSelect)
+        .maybeSingle();
+    }
+
+    if (attempt.error) {
+      console.error("[products.update] update failed", attempt.error);
+      return res.status(500).json({ error: attempt.error.message || "Failed to update product" });
+    }
+    if (!attempt.data) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    if (storagePaths.length) {
+      const delImg = await supabase.from("product_images").delete().eq("product_id", id);
+      if (delImg.error) throw delImg.error;
+      await persistProductImages(supabase, id, storagePaths);
+    }
+
+    const extraUrls = await fetchProductImageUrls(supabase, id);
+    const product = mapRowToApiProduct(attempt.data, extraUrls);
+    return res.json(product);
+  } catch (error) {
+    console.error("[products.update] unexpected error", error);
+    const message = error instanceof Error ? error.message : "Failed to update product";
+    return res.status(400).json({ error: message });
+  }
+}
+
 export async function deleteProduct(req, res) {
   try {
     const supabase = req.app.locals.supabase;
@@ -335,7 +486,7 @@ export async function deleteProduct(req, res) {
 
     const [imgRes, prodRes] = await Promise.all([
       supabase.from("product_images").select("url, image_url").eq("product_id", id),
-      supabase.from("products").select("id, image_url, image").eq("id", id).maybeSingle()
+      supabase.from("products").select("*").eq("id", id).maybeSingle()
     ]);
     if (imgRes.error) throw imgRes.error;
     if (prodRes.error) throw prodRes.error;
@@ -373,18 +524,19 @@ export async function deleteProduct(req, res) {
     if (deleteImages.error) throw deleteImages.error;
     console.log("DB RESPONSE:", deleteImages.data);
 
-    const result = await supabase
+    const { data: deletedRows, error: deleteErr } = await supabase
       .from("products")
       .delete()
       .eq("id", id)
-      .select("id")
-      .maybeSingle();
-    if (result.error) throw result.error;
-    console.log("DB RESPONSE:", result.data);
+      .select("id");
+    if (deleteErr) throw deleteErr;
+    console.log("DB RESPONSE:", deletedRows);
 
-    if (!result.data) return res.status(404).json({ error: "Product not found" });
+    if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
     await removeProductPathsFromStorage(supabase, pathsToRemove);
-    return res.json({ id: result.data.id, deleted: true });
+    return res.json({ id: deletedRows[0].id, deleted: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Server error";
     console.error("[products.delete] error", message);

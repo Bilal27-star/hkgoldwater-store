@@ -12,8 +12,10 @@ import {
   deleteProductApi,
   getCategories,
   getProductsApi,
-  getToken
+  getToken,
+  updateProductApi
 } from "../../api";
+import type { ProductEditorPayload } from "../components/products/ProductEditor";
 import { useI18n } from "../../i18n/I18nProvider";
 import { ADMIN_DATA_STORAGE_KEY } from "../constants";
 import {
@@ -70,7 +72,7 @@ type AdminDataContextValue = {
   addProduct: (
     p: Omit<AdminProduct, "id" | "createdAt" | "updatedAt"> & { imageFiles?: File[] }
   ) => Promise<AdminProduct>;
-  updateProduct: (id: string, patch: Partial<AdminProduct>) => void;
+  updateProduct: (id: string, payload: ProductEditorPayload) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   addCategory: (name: string) => AdminCategory;
   updateCategory: (id: string, name: string) => void;
@@ -237,17 +239,40 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProduct = useCallback(
-    (id: string, patch: Partial<AdminProduct>) => {
+    async (id: string, p: ProductEditorPayload) => {
+      if (p.imageFiles && p.imageFiles.length > 0) {
+        const fd = new FormData();
+        fd.append("name", p.name);
+        fd.append("description", p.description || "");
+        fd.append("price", String(p.price));
+        fd.append("stock", String(p.stock));
+        fd.append("category_id", p.categoryId);
+        if (p.brandId) fd.append("brand_id", p.brandId);
+        p.imageFiles.forEach((file) => fd.append("images", file));
+        const updated = await updateProductApi(id, fd);
+        const mapped = mapApiProductToAdminProduct(updated);
+        setAndPersist((s) => ({
+          ...s,
+          products: s.products.map((pr) => (pr.id === id ? mapped : pr))
+        }));
+        return;
+      }
+      const updated = await updateProductApi(id, {
+        name: p.name,
+        description: p.description || undefined,
+        price: p.price,
+        stock: p.stock,
+        category_id: p.categoryId,
+        brand_id: p.brandId || undefined,
+        image_url: p.image || undefined
+      });
+      const mapped = mapApiProductToAdminProduct(updated);
       setAndPersist((s) => ({
         ...s,
-        products: s.products.map((pr) =>
-          pr.id === id
-            ? { ...pr, ...patch, updatedAt: new Date().toISOString() }
-            : pr
-        )
+        products: s.products.map((pr) => (pr.id === id ? mapped : pr))
       }));
     },
-    [setAndPersist]
+    [mapApiProductToAdminProduct, setAndPersist]
   );
 
   const deleteProduct = useCallback(

@@ -49,7 +49,7 @@ export default function ProductDrawer({ open, mode, product, onClose, onSaved }:
         await addProduct(payload);
         toast.success("Product created");
       } else if (mode === "edit" && product) {
-        updateProduct(product.id, payload);
+        await updateProduct(product.id, payload);
         toast.success("Product updated");
       }
       onSaved();

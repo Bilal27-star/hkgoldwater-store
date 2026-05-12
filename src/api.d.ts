@@ -49,6 +49,20 @@ export function createProductApi(
       }
 ): Promise<any>;
 export function deleteProductApi(productId: string): Promise<any>;
+export function updateProductApi(
+  productId: string,
+  payload:
+    | FormData
+    | {
+        name: string;
+        description?: string;
+        price: number;
+        stock?: number;
+        category_id?: string;
+        brand_id?: string;
+        image_url?: string;
+      }
+): Promise<any>;
 
 export function addToCartApi(payload: {
   productId: string;

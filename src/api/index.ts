@@ -388,6 +388,35 @@ export async function deleteProductApi(productId: string) {
   });
 }
 
+export async function updateProductApi(
+  productId: string,
+  payload:
+    | FormData
+    | {
+        name: string;
+        description?: string;
+        price: number;
+        stock?: number;
+        category_id?: string;
+        brand_id?: string;
+        image_url?: string;
+      }
+) {
+  const path = `/products/${encodeURIComponent(String(productId || "").trim())}`;
+  if (typeof FormData !== "undefined" && payload instanceof FormData) {
+    return request(path, {
+      method: "PATCH",
+      body: payload,
+      requireAuth: true
+    });
+  }
+  return request(path, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    requireAuth: true
+  });
+}
+
 export async function addToCartApi(payload: { productId: string; quantity: number }) {
   return request("/cart", {
     method: "POST",

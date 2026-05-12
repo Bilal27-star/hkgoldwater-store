@@ -48,7 +48,7 @@ export default function ProductForm() {
         await addProduct(payload);
         toast.success("Product created");
       } else if (id) {
-        updateProduct(id, payload);
+        await updateProduct(id, payload);
         toast.success("Product updated");
       }
       navigate("/admin/products");
