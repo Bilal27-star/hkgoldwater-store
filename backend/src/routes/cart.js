@@ -1,6 +1,7 @@
 import { Router } from "express";
 import auth from "../middleware/auth.js";
 import { findOrCreateCart, normalizeProductId } from "../lib/cartUtils.js";
+import { expandStoragePathToPublicUrl } from "../utils/productStorage.js";
 
 const router = Router();
 
@@ -64,7 +65,18 @@ router.get("/", auth, async (req, res) => {
       .select("id,cart_id,product_id,quantity,products(*)")
       .eq("cart_id", cart.id);
     if (error) throw error;
-    res.json({ cartId: cart.id, items: data || [] });
+    const base = process.env.SUPABASE_URL;
+    const items = (data || []).map((row) => {
+      const p = row?.products;
+      if (!p || typeof p !== "object") return row;
+      const next = {
+        ...p,
+        image_url: expandStoragePathToPublicUrl(p.image_url, base),
+        image: expandStoragePathToPublicUrl(p.image ?? p.image_url, base)
+      };
+      return { ...row, products: next };
+    });
+    res.json({ cartId: cart.id, items });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
