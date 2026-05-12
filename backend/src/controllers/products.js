@@ -140,7 +140,7 @@ export async function listProducts(req, res) {
     const supabase = req.app.locals.supabase;
     const result = await supabase
       .from("products")
-      .select("*")
+      .select("*, category:categories(id,name), brand_relation:brands(id,name,category_id)")
       .order("created_at", { ascending: false });
     if (result.error) throw result.error;
     console.log("DB RESPONSE:", result.data);

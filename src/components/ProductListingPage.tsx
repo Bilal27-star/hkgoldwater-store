@@ -76,7 +76,10 @@ export default function ProductListingPage() {
             const price = Number.isFinite(priceNum) ? priceNum : 0;
             return {
               id,
-              brand: String(item.brand_id || ""),
+              brand:
+                resolveLocalizedText(item.brand?.name, language) ||
+                resolveLocalizedText(item.brand_name, language) ||
+                "",
               title:
                 resolveLocalizedText(item.name || item.title, language) ||
                 "Unnamed product",

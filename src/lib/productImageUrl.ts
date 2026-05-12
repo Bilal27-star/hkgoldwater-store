@@ -85,6 +85,14 @@ function normalizeObjectPath(ref: string): string {
   return dedupeBucketPrefixInPath(p);
 }
 
+/** DB mistakes may put a brand_id UUID in image fields — never treat as a storage key. */
+const UUID_ONLY =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuidOnlyString(value: string): boolean {
+  return UUID_ONLY.test(String(value || "").trim());
+}
+
 /** Extract `products/...` object path from any Supabase public object URL. */
 function objectPathFromSupabasePublicUrl(urlStr: string): string | null {
   try {
@@ -104,6 +112,7 @@ export function productImageRefToDisplayUrl(ref: string): string {
   const t = String(ref || "").trim();
   if (!t) return "";
   if (t.startsWith("blob:") || t.startsWith("data:")) return t;
+  if (isUuidOnlyString(t)) return "";
 
   if (/^https?:\/\//i.test(t)) {
     const fromSupabase = objectPathFromSupabasePublicUrl(t);
