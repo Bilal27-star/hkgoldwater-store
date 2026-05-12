@@ -157,14 +157,19 @@ app.use((req, _res, next) => {
 app.get("/api/health", (_req, res) => {
   console.log("[route-hit] GET /api/health");
   let supabaseHost = null;
+  let supabaseUrl = null;
   try {
-    supabaseHost = new URL(process.env.SUPABASE_URL).hostname;
+    const u = new URL(process.env.SUPABASE_URL);
+    supabaseHost = u.hostname;
+    supabaseUrl = u.origin.replace(/\/+$/, "");
   } catch {
     /* ignore */
   }
   res.json({
     status: "ok",
     ...(supabaseHost ? { supabaseHost } : {}),
+    /** Public project URL for Storage `getPublicUrl` (no secrets). Frontend may use if VITE_SUPABASE_URL is unset. */
+    ...(supabaseUrl ? { supabaseUrl } : {}),
     /** Matches POST /api/admin/login: `public.admins` + bcrypt, not Supabase Auth. */
     adminAuthMode: "public_admins_bcrypt"
   });

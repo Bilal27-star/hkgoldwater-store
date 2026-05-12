@@ -1,5 +1,6 @@
 import type { SyntheticEvent } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { API_BASE_URL } from "../api/config";
 
 export const PRODUCTS_STORAGE_BUCKET = "products";
 export const PRODUCT_IMAGE_FALLBACK_SRC = "/logo.png";
@@ -9,9 +10,10 @@ let browserClient: SupabaseClient | null | undefined;
 function getBrowserSupabase(): SupabaseClient | null {
   if (browserClient === null) return null;
   if (browserClient) return browserClient;
-  const url = import.meta.env.VITE_SUPABASE_URL;
+  const url =
+    String(import.meta.env.VITE_SUPABASE_URL || "").trim() || getResolvedSupabaseProjectBase();
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!String(url || "").trim() || !String(key || "").trim()) {
+  if (!url || !String(key || "").trim()) {
     browserClient = null;
     return null;
   }
@@ -21,15 +23,40 @@ function getBrowserSupabase(): SupabaseClient | null {
   return browserClient;
 }
 
-function supabaseProjectBase(): string {
+function supabaseProjectBaseFromEnv(): string {
   return String(import.meta.env.VITE_SUPABASE_URL || "")
     .trim()
     .replace(/\/+$/, "");
 }
 
+/** Populated from GET /api/health `supabaseUrl` when the SPA build has no VITE_SUPABASE_URL. */
+let runtimeSupabaseBase = "";
+
+export function getResolvedSupabaseProjectBase(): string {
+  return supabaseProjectBaseFromEnv() || runtimeSupabaseBase.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Bootstrap: fetch public Supabase project origin from the API (same SUPABASE_URL as backend).
+ * Await before first paint so image URLs work when Vercel omits VITE_SUPABASE_URL.
+ */
+export async function primeSupabaseBaseFromApi(): Promise<void> {
+  if (supabaseProjectBaseFromEnv()) return;
+  if (runtimeSupabaseBase) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/health`, { credentials: "omit" });
+    if (!res.ok) return;
+    const body = (await res.json()) as { supabaseUrl?: string };
+    const u = String(body?.supabaseUrl || "").trim().replace(/\/+$/, "");
+    if (u) runtimeSupabaseBase = u;
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Same path Supabase uses for public objects; no network or anon key required. */
 function buildPublicStorageUrl(objectPath: string): string {
-  const base = supabaseProjectBase();
+  const base = getResolvedSupabaseProjectBase();
   if (!base) return "";
   const raw = String(objectPath || "").trim().replace(/^\/+/, "");
   if (!raw) return "";
@@ -71,7 +98,7 @@ function objectPathFromSupabasePublicUrl(urlStr: string): string | null {
 
 /**
  * Build a public URL for a stored object path, or pass through absolute / blob / data URLs.
- * Uses VITE_SUPABASE_URL alone for public bucket URLs (anon key not required).
+ * Uses VITE_SUPABASE_URL, or runtime base from GET /api/health, plus public Storage path (no anon key).
  */
 export function productImageRefToDisplayUrl(ref: string): string {
   const t = String(ref || "").trim();
