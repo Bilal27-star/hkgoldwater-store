@@ -477,6 +477,48 @@ export async function updateProduct(req, res) {
   }
 }
 
+/**
+ * Clear FKs from order_items so products can be deleted.
+ * Tries SET NULL first; if that fails (e.g. NOT NULL column), deletes matching rows.
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} productId
+ */
+async function detachOrderItemsFromProduct(supabase, productId) {
+  const upd = await supabase
+    .from("order_items")
+    .update({ product_id: null })
+    .eq("product_id", productId);
+  if (!upd.error) return;
+
+  const msg = String(upd.error.message || "");
+  if (/42P01|does not exist|relation .* does not exist/i.test(msg)) {
+    console.warn("[products.delete] order_items not available, skip:", msg);
+    return;
+  }
+
+  console.warn("[products.delete] order_items update null failed, trying delete lines:", msg);
+  const del = await supabase.from("order_items").delete().eq("product_id", productId);
+  if (del.error) {
+    console.error("[products.delete] order_items delete failed:", del.error.message);
+    throw del.error;
+  }
+}
+
+/**
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} productId
+ */
+async function deleteCartItemsForProduct(supabase, productId) {
+  const del = await supabase.from("cart_items").delete().eq("product_id", productId);
+  if (!del.error) return;
+  const msg = String(del.error.message || "");
+  if (/42P01|does not exist|relation .* does not exist/i.test(msg)) {
+    console.warn("[products.delete] cart_items not available, skip:", msg);
+    return;
+  }
+  throw del.error;
+}
+
 export async function deleteProduct(req, res) {
   try {
     const supabase = req.app.locals.supabase;
@@ -485,15 +527,23 @@ export async function deleteProduct(req, res) {
     if (!id) return res.status(400).json({ error: "Product id is required" });
 
     const [imgRes, prodRes] = await Promise.all([
-      supabase.from("product_images").select("url, image_url").eq("product_id", id),
+      supabase.from("product_images").select("*").eq("product_id", id),
       supabase.from("products").select("*").eq("id", id).maybeSingle()
     ]);
-    if (imgRes.error) throw imgRes.error;
+
+    if (imgRes.error) {
+      const im = String(imgRes.error.message || "");
+      if (!/42P01|does not exist|relation .* does not exist/i.test(im)) {
+        throw imgRes.error;
+      }
+      console.warn("[products.delete] product_images prefetch skipped:", im);
+    }
     if (prodRes.error) throw prodRes.error;
     if (!prodRes.data) return res.status(404).json({ error: "Product not found" });
 
+    const imgRows = Array.isArray(imgRes.data) ? imgRes.data : [];
     const pathsToRemove = [];
-    for (const row of imgRes.data || []) {
+    for (const row of imgRows) {
       const p = extractProductsBucketPath(row.url || row.image_url);
       if (p) pathsToRemove.push(p);
     }
@@ -502,27 +552,19 @@ export async function deleteProduct(req, res) {
       if (p) pathsToRemove.push(p);
     }
 
-    // Remove FK dependencies first so product delete cannot fail on references.
-    const clearOrderItems = await supabase
-      .from("order_items")
-      .update({ product_id: null })
-      .eq("product_id", id);
-    if (clearOrderItems.error) throw clearOrderItems.error;
-    console.log("DB RESPONSE:", clearOrderItems.data);
+    await detachOrderItemsFromProduct(supabase, id);
+    await deleteCartItemsForProduct(supabase, id);
 
-    const deleteCartItems = await supabase
-      .from("cart_items")
-      .delete()
-      .eq("product_id", id);
-    if (deleteCartItems.error) throw deleteCartItems.error;
-    console.log("DB RESPONSE:", deleteCartItems.data);
-
-    const deleteImages = await supabase
-      .from("product_images")
-      .delete()
-      .eq("product_id", id);
-    if (deleteImages.error) throw deleteImages.error;
-    console.log("DB RESPONSE:", deleteImages.data);
+    const deleteImages = await supabase.from("product_images").delete().eq("product_id", id);
+    if (deleteImages.error) {
+      const dm = String(deleteImages.error.message || "");
+      if (!/42P01|does not exist|relation .* does not exist/i.test(dm)) {
+        throw deleteImages.error;
+      }
+      console.warn("[products.delete] product_images delete skipped:", dm);
+    } else {
+      console.log("DB RESPONSE:", deleteImages.data);
+    }
 
     const { data: deletedRows, error: deleteErr } = await supabase
       .from("products")
@@ -538,8 +580,16 @@ export async function deleteProduct(req, res) {
     await removeProductPathsFromStorage(supabase, pathsToRemove);
     return res.json({ id: deletedRows[0].id, deleted: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Server error";
-    console.error("[products.delete] error", message);
+    const message =
+      error instanceof Error
+        ? error.message
+        : error &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof /** @type {{ message?: unknown }} */ (error).message === "string"
+          ? String(/** @type {{ message?: unknown }} */ (error).message)
+          : "Server error";
+    console.error("[products.delete] error", message, error);
     return res.status(500).json({ error: message });
   }
 }
