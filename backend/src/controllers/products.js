@@ -1,3 +1,10 @@
+import {
+  extractProductsBucketPath,
+  normalizeImageRefForDb,
+  removeProductPathsFromStorage,
+  uploadProductFilesToStorage
+} from "../utils/productStorage.js";
+
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -192,16 +199,15 @@ export async function createProduct(req, res) {
   console.log("Incoming product:", req.body);
   console.log("Creating product:", req.body);
   const uploadedFiles = Array.isArray(req.files) ? req.files : [];
-  const hostBase = `${req.protocol}://${req.get("host")}`;
-  const uploadedUrls = uploadedFiles.map((f) => `${hostBase}/uploads/products/${f.filename}`);
+  const supabaseBase = process.env.SUPABASE_URL || "";
   const { name: rawName, description: rawDescription, price: rawPrice } = body;
   const name = toLocalizedObject(rawName);
   const description = toLocalizedObject(rawDescription);
   const price = asNumber(rawPrice);
   const categoryId = asCategoryId(body);
   const brandId = asBrandId(body);
-  const imageUrl = asImageUrl(body);
-  const resolvedPrimaryImage = uploadedUrls[0] || imageUrl || null;
+  const imageUrlRaw = asImageUrl(body);
+  const normalizedBodyImage = normalizeImageRefForDb(imageUrlRaw, supabaseBase);
   const stockRaw = body.stock;
   const stockParsed = asNumber(stockRaw);
   const stock = Number.isFinite(stockParsed) ? Math.max(0, Math.trunc(stockParsed)) : 0;
@@ -245,6 +251,20 @@ export async function createProduct(req, res) {
       resolvedBrandId = brandCheck.data.id;
     }
 
+    let storagePaths = [];
+    if (uploadedFiles.length) {
+      try {
+        storagePaths = await uploadProductFilesToStorage(supabase, uploadedFiles);
+      } catch (uploadErr) {
+        console.error("[products.create] storage upload failed", uploadErr);
+        const message =
+          uploadErr instanceof Error ? uploadErr.message : "Product image upload failed";
+        return res.status(500).json({ error: message });
+      }
+    }
+
+    const resolvedPrimaryImage = storagePaths[0] ?? normalizedBodyImage ?? null;
+
     const basePayload = {
       name,
       description,
@@ -277,8 +297,8 @@ export async function createProduct(req, res) {
       return res.status(500).json({ error: attempt.error.message || "Failed to create product" });
     }
 
-    if (uploadedUrls.length) {
-      await persistProductImages(supabase, attempt.data.id, uploadedUrls);
+    if (storagePaths.length) {
+      await persistProductImages(supabase, attempt.data.id, storagePaths);
     }
 
     const createdProduct = await supabase
@@ -294,7 +314,7 @@ export async function createProduct(req, res) {
     }
 
     console.log("DB RESPONSE:", createdProduct.data);
-    let mergedUrls = uploadedUrls.length > 0 ? [...uploadedUrls] : [];
+    let mergedUrls = storagePaths.length > 0 ? [...storagePaths] : [];
     if (!mergedUrls.length && resolvedPrimaryImage) mergedUrls = [resolvedPrimaryImage];
     const product = mapRowToApiProduct(createdProduct.data, mergedUrls);
     console.log("Created product:", product);
@@ -312,6 +332,24 @@ export async function deleteProduct(req, res) {
     const id = String(req.params.id || "").trim();
     console.log("Deleting product ID:", id);
     if (!id) return res.status(400).json({ error: "Product id is required" });
+
+    const [imgRes, prodRes] = await Promise.all([
+      supabase.from("product_images").select("url, image_url").eq("product_id", id),
+      supabase.from("products").select("id, image_url, image").eq("id", id).maybeSingle()
+    ]);
+    if (imgRes.error) throw imgRes.error;
+    if (prodRes.error) throw prodRes.error;
+    if (!prodRes.data) return res.status(404).json({ error: "Product not found" });
+
+    const pathsToRemove = [];
+    for (const row of imgRes.data || []) {
+      const p = extractProductsBucketPath(row.url || row.image_url);
+      if (p) pathsToRemove.push(p);
+    }
+    for (const col of [prodRes.data.image_url, prodRes.data.image]) {
+      const p = extractProductsBucketPath(col);
+      if (p) pathsToRemove.push(p);
+    }
 
     // Remove FK dependencies first so product delete cannot fail on references.
     const clearOrderItems = await supabase
@@ -345,6 +383,7 @@ export async function deleteProduct(req, res) {
     console.log("DB RESPONSE:", result.data);
 
     if (!result.data) return res.status(404).json({ error: "Product not found" });
+    await removeProductPathsFromStorage(supabase, pathsToRemove);
     return res.json({ id: result.data.id, deleted: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Server error";

@@ -10,6 +10,7 @@ import {
   type SetStateAction
 } from "react";
 import { addToCartApi, clearCartApi, getCartApi, getToken, removeCartItemApi } from "../api";
+import { productImageSrcWithFallback } from "../lib/productImageUrl";
 
 export type CartItem = {
   id: string;
@@ -122,7 +123,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         id: item.product_id,
         name: item.products?.name,
         price: item.products?.price,
-        image: item.products?.image || item.products?.image_url || "https://via.placeholder.com/400",
+        image: productImageSrcWithFallback(
+          String(item.products?.image || item.products?.image_url || "").trim()
+        ),
         quantity: item.quantity
       }))
     );

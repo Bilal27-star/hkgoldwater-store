@@ -84,7 +84,7 @@ export default function ProductListingPage() {
               rating: Number(item.rating || 0),
               reviewCount: Number(item.review_count || 0),
               price,
-              imageUrl: item.image || item.image_url || ""
+              imageUrl: String(item.image || item.image_url || "").trim()
             };
           })
           .filter((item): item is ProductItem => item !== null);

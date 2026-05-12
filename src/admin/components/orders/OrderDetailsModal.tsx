@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { MapPin, Phone, X } from "lucide-react";
 import type { OrderCustomerRow } from "../../types/ordersCustomers";
+import { onProductImageError, productImageSrcWithFallback } from "../../../lib/productImageUrl";
 import StatusBadge from "./StatusBadge";
 
 type Props = {
@@ -134,10 +135,11 @@ export default function OrderDetailsModal({ open, onClose, order }: Props) {
                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-slate-100 ring-1 ring-slate-200">
                       {line.thumbnailUrl ? (
                         <img
-                          src={line.thumbnailUrl}
+                          src={productImageSrcWithFallback(line.thumbnailUrl)}
                           alt=""
                           className="h-full w-full object-cover"
                           loading="lazy"
+                          onError={onProductImageError}
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">

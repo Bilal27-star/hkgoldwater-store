@@ -8,6 +8,11 @@ import SiteFooter from "./SiteFooter";
 import { useI18n } from "../i18n/I18nProvider";
 
 import Logo from "../assets/logo.png";
+import {
+  onProductImageError,
+  productImageRefToDisplayUrl,
+  PRODUCT_IMAGE_FALLBACK_SRC
+} from "../lib/productImageUrl";
 /** Order matches `homePage.trustItems` in locale files: delivery, payment, quality, support */
 const TRUST_ICONS: LucideIcon[] = [Truck, ShieldCheck, Award, Headphones];
 
@@ -17,6 +22,9 @@ type FeaturedProduct = {
   rating: number;
   reviewCount: number;
   price: number;
+  /** Stored path or legacy absolute URL from API */
+  imageRef: string;
+  /** Resolved browser URL for <img src> */
   imageUrl: string;
 };
 
@@ -64,13 +72,15 @@ export default function HomePage() {
           const rating = Number.isFinite(ratingNum) ? ratingNum : 0;
           const reviewCountNum = Number(item.review_count ?? 0);
           const reviewCount = Number.isFinite(reviewCountNum) ? reviewCountNum : 0;
+          const imageRef = String(item.image || item.image_url || "").trim();
           return {
             id: String(item.id),
             name: resolveLocalizedText(item.name || item.title, language) || "Product",
             rating,
             reviewCount,
             price,
-            imageUrl: String(item.image || item.image_url || "").trim()
+            imageRef,
+            imageUrl: productImageRefToDisplayUrl(imageRef)
           };
         });
         if (!cancelled) {
@@ -125,16 +135,19 @@ export default function HomePage() {
                 >
                   <div
                     className={
-                      product.imageUrl ? "product-image overflow-hidden bg-[#eef2f7]" : `product-image img-${i + 1}`
+                      product.imageRef
+                        ? "product-image overflow-hidden bg-[#eef2f7]"
+                        : `product-image img-${i + 1}`
                     }
                   >
-                    {product.imageUrl ? (
+                    {product.imageRef ? (
                       <img
-                        src={product.imageUrl}
+                        src={product.imageUrl || PRODUCT_IMAGE_FALLBACK_SRC}
                         alt=""
                         className="block h-full min-h-[292px] w-full object-cover"
                         loading="lazy"
                         decoding="async"
+                        onError={onProductImageError}
                       />
                     ) : null}
                   </div>

@@ -1,6 +1,7 @@
 import { Minus, Plus, X } from "lucide-react";
 import type { CartItem } from "../../context/CartContext";
 import { useI18n } from "../../i18n/I18nProvider";
+import { onProductImageError } from "../../lib/productImageUrl";
 
 function formatDa(value: number) {
   return `${value.toLocaleString("fr-DZ")} DA`;
@@ -36,6 +37,7 @@ export default function CartLineItem({
           src={item.image}
           alt={item.name}
           className="h-full w-full object-cover"
+          onError={onProductImageError}
         />
       </div>
 

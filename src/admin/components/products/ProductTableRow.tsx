@@ -1,4 +1,5 @@
 import { Eye, Pencil, Trash2 } from "lucide-react";
+import { onProductImageError, productImageSrcWithFallback } from "../../../lib/productImageUrl";
 import type { AdminProduct } from "../../types";
 import StockBadge from "./StockBadge";
 
@@ -23,9 +24,10 @@ export default function ProductTableRow({
         <div className="flex items-center gap-3">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/80 transition group-hover:ring-slate-300">
             <img
-              src={product.image}
+              src={productImageSrcWithFallback(product.image)}
               alt=""
               className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+              onError={onProductImageError}
             />
           </div>
           <div className="min-w-0">

@@ -2,6 +2,7 @@ import { ShoppingCart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useI18n } from "../i18n/I18nProvider";
+import { onProductImageError, productImageSrcWithFallback } from "../lib/productImageUrl";
 
 export type ProductItem = {
   id: string;
@@ -52,10 +53,11 @@ export default function ProductCard({ product }: ProductCardProps) {
     >
       <div className="mb-4 block overflow-hidden rounded-xl bg-gray-100">
         <img
-          src={product.imageUrl}
+          src={productImageSrcWithFallback(product.imageUrl)}
           alt=""
           className="aspect-square h-full w-full object-cover"
           loading="lazy"
+          onError={onProductImageError}
         />
       </div>
       <p className="mb-1 text-xs text-gray-500">{product.brand}</p>
@@ -80,7 +82,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               id: product.id,
               name: product.title,
               price: product.price,
-              image: product.imageUrl
+              image: productImageSrcWithFallback(product.imageUrl)
             });
           }}
         >

@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { getBrands, getToken } from "../../../api";
+import {
+  onProductImageError,
+  productImageRefToDisplayUrl,
+  productImageSrcWithFallback
+} from "../../../lib/productImageUrl";
 import ImageUploader from "./ImageUploader";
 import type { AdminCategory, AdminProduct } from "../../types";
 
@@ -292,7 +297,7 @@ export default function ProductEditor({
             );
             setImages(files);
           }}
-          existingImageUrl={initialProduct?.image?.trim() || ""}
+          existingImageUrl={productImageRefToDisplayUrl(initialProduct?.image?.trim() || "")}
           maxFiles={4}
           disabled={false}
           maxSizeMb={2}
@@ -302,9 +307,10 @@ export default function ProductEditor({
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="mb-2 text-xs font-medium uppercase text-slate-500">Image</p>
           <img
-            src={initialProduct.image}
+            src={productImageSrcWithFallback(initialProduct.image)}
             alt=""
             className="max-h-48 w-auto max-w-full rounded-lg object-contain"
+            onError={onProductImageError}
           />
         </div>
       )}

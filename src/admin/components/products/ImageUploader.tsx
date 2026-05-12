@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ImageIcon, Trash2, Upload } from "lucide-react";
+import { onProductImageError } from "../../../lib/productImageUrl";
 
 const DEBUG = "[ImageUploader]";
 const DEFAULT_MAX_MB = 2;
@@ -173,6 +174,7 @@ export default function ImageUploader({
                   src={src}
                   alt=""
                   className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
+                  onError={onProductImageError}
                 />
               ))}
             </div>

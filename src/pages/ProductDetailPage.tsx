@@ -3,6 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getProductByIdApi } from "../api";
 import { useCart } from "../context/CartContext";
+import {
+  onProductImageError,
+  productImageSrcWithFallback,
+  PRODUCT_IMAGE_FALLBACK_SRC
+} from "../lib/productImageUrl";
 
 function resolveLocalizedText(value: unknown, lang: "fr" | "en" | "ar") {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -71,11 +76,12 @@ export default function ProductDetailPage() {
         const normalizedImages = rowImages
           .map((img: unknown) => String(img || "").trim())
           .filter(Boolean);
+        const toDisplay = (ref: string) => productImageSrcWithFallback(ref);
         const images = normalizedImages.length
-          ? normalizedImages
+          ? normalizedImages.map(toDisplay)
           : mainImage
-            ? [mainImage]
-            : ["/logo.png"];
+            ? [toDisplay(mainImage)]
+            : [PRODUCT_IMAGE_FALLBACK_SRC];
         const galleryImages =
           images.length === 1
             ? [images[0], images[0], images[0], images[0]]
@@ -171,6 +177,7 @@ export default function ProductDetailPage() {
                 src={product.images[activeImageIndex] || product.images[0]}
                 alt={product.name}
                 className="aspect-square h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                onError={onProductImageError}
               />
             </div>
             <div className="mt-4 flex gap-3">
@@ -185,7 +192,7 @@ export default function ProductDetailPage() {
                       : "border-transparent hover:border-slate-300"
                   }`}
                 >
-                  <img src={img} alt="" className="h-16 w-16 object-cover" />
+                  <img src={img} alt="" className="h-16 w-16 object-cover" onError={onProductImageError} />
                 </button>
               ))}
             </div>

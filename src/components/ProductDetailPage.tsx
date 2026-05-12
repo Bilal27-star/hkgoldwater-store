@@ -19,6 +19,11 @@ import { useI18n } from "../i18n/I18nProvider";
 import Breadcrumb from "./Breadcrumb";
 import ProductCard from "./ProductCard";
 import SiteFooter from "./SiteFooter";
+import {
+  onProductImageError,
+  productImageSrcWithFallback,
+  PRODUCT_IMAGE_FALLBACK_SRC
+} from "../lib/productImageUrl";
 
 function formatDa(value: number) {
   return `${value.toLocaleString("fr-DZ")} DA`;
@@ -75,6 +80,7 @@ function ProductImageGallery({
           src={main}
           alt={alt}
           className="aspect-square w-full object-cover"
+          onError={onProductImageError}
         />
         <div className="absolute right-3 top-3 flex gap-2">
           <button
@@ -105,7 +111,7 @@ function ProductImageGallery({
                 : "ring-transparent hover:ring-gray-300"
             }`}
           >
-            <img src={src} alt="" className="aspect-square w-full object-cover" />
+            <img src={src} alt="" className="aspect-square w-full object-cover" onError={onProductImageError} />
           </button>
         ))}
       </div>
@@ -154,6 +160,7 @@ export default function ProductDetailPage({ productId: productIdProp }: ProductD
           setProduct(null);
           return;
         }
+        const rawImg = String(row.image || row.image_url || "").trim();
         setProduct({
           id: String(row.id),
           title: resolveLocalizedText(row.name || row.title, language) || "Product",
@@ -162,7 +169,7 @@ export default function ProductDetailPage({ productId: productIdProp }: ProductD
           rating: Number(row.rating || 0),
           reviewCount: Number(row.review_count || 0),
           price: Number(row.price || 0),
-          images: [row.image || row.image_url || ""],
+          images: [rawImg ? productImageSrcWithFallback(rawImg) : PRODUCT_IMAGE_FALLBACK_SRC],
           stock: Number(row.stock || 0) > 0,
           description: [resolveLocalizedText(row.description, language)].filter(Boolean),
           features: [],
@@ -199,7 +206,7 @@ export default function ProductDetailPage({ productId: productIdProp }: ProductD
         rating: Number(p.rating || 0),
         reviewCount: Number(p.review_count || 0),
         price: Number(p.price || 0),
-        imageUrl: p.image || p.image_url || ""
+        imageUrl: String(p.image || p.image_url || "").trim()
       }));
   }, [catalog, language, product?.id]);
 

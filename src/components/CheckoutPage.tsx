@@ -16,6 +16,7 @@ import { useCart } from "../context/CartContext";
 import { useI18n } from "../i18n/I18nProvider";
 import SiteFooter from "./SiteFooter";
 import { createOrderApi, getToken } from "../api";
+import { onProductImageError } from "../lib/productImageUrl";
 
 type CheckoutForm = {
   fullName: string;
@@ -427,6 +428,7 @@ export default function CheckoutPage() {
                             src={item.image}
                             alt=""
                             className="h-full w-full object-cover"
+                            onError={onProductImageError}
                           />
                         </div>
                         <div className="min-w-0 flex-1">
