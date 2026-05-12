@@ -67,6 +67,30 @@ export function extractProductsBucketPath(value) {
   return ref;
 }
 
+/** DB mistakes may store a bare UUID in image fields — do not treat as a storage key. */
+const UUID_ONLY =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Turn a persisted storage ref (e.g. `products/file.jpg`) into a public object URL.
+ * Full `http(s)` values are returned unchanged.
+ * @param {string | null | undefined} raw
+ * @param {string | null | undefined} supabaseUrl
+ * @returns {string | null}
+ */
+export function expandStoragePathToPublicUrl(raw, supabaseUrl) {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  if (UUID_ONLY.test(s)) return null;
+  if (s.startsWith("blob:") || s.startsWith("data:")) return null;
+  if (/^https?:\/\//i.test(s)) return s;
+  const base = String(supabaseUrl ?? "").trim().replace(/\/+$/, "");
+  if (!base) return null;
+  const ref = normalizeImageRefForDb(s, supabaseUrl);
+  if (!ref) return null;
+  return `${base}/storage/v1/object/public/${PRODUCTS_BUCKET}/${ref}`;
+}
+
 /**
  * Upload multer-saved files to Storage; returns object paths for DB.
  * Local temp files are removed after successful upload.
