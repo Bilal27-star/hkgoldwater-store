@@ -1,3 +1,9 @@
+import {
+  applySocialValueNormalization,
+  formatSupabaseWriteError,
+  validateSocialMediaState
+} from "../utils/socialMediaNormalize.js";
+
 const SETTINGS_ID = 1;
 
 const DEFAULT_SETTINGS = {
@@ -58,9 +64,54 @@ function mergeSocialMedia(raw) {
   return base;
 }
 
+function cloneJsonSafe(obj) {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return mergeSocialMedia(null);
+  }
+}
+
+/**
+ * Merge request body, normalize URLs / WhatsApp, validate enabled fields.
+ * @returns {{ ok: true, data: object } | { ok: false, status: number, error: string, field?: string }}
+ */
 function normalizeSocialBody(body) {
-  const merged = mergeSocialMedia(body);
-  return merged;
+  let merged;
+  try {
+    merged = mergeSocialMedia(body ?? {});
+  } catch {
+    return { ok: false, status: 400, error: "Invalid social media payload." };
+  }
+
+  const hadValue = {};
+  for (const id of PLATFORM_IDS) {
+    hadValue[id] = Boolean(String(merged[id]?.value ?? "").trim());
+  }
+
+  try {
+    applySocialValueNormalization(merged);
+  } catch {
+    return { ok: false, status: 400, error: "Could not process social media values." };
+  }
+
+  for (const id of PLATFORM_IDS) {
+    if (merged[id]?.enabled && hadValue[id] && !String(merged[id]?.value ?? "").trim()) {
+      return {
+        ok: false,
+        status: 400,
+        error: `${id}: value could not be normalized to a safe URL or number.`,
+        field: id
+      };
+    }
+  }
+
+  const v = validateSocialMediaState(merged);
+  if (!v.ok) {
+    return { ok: false, status: 400, error: v.message, field: v.field };
+  }
+
+  return { ok: true, data: cloneJsonSafe(merged) };
 }
 
 function mapSettingsRow(row) {
@@ -109,13 +160,18 @@ export async function getSocialMedia(req, res) {
     return res.json(mergeSocialMedia(result.data?.social_media));
   } catch (error) {
     console.error("[settings.social.get] error", error);
-    return res.status(500).json({ error: "Server error" });
+    return res.json(mergeSocialMedia(null));
   }
 }
 
 export async function patchSocialMedia(req, res) {
+  const parsed = normalizeSocialBody(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error, field: parsed.field });
+  }
+  const normalized = parsed.data;
+
   try {
-    const normalized = normalizeSocialBody(req.body ?? {});
     const supabase = req.app.locals.supabase;
 
     const { data: existing, error: lookupErr } = await supabase
@@ -124,7 +180,10 @@ export async function patchSocialMedia(req, res) {
       .eq("id", SETTINGS_ID)
       .maybeSingle();
 
-    if (lookupErr) throw lookupErr;
+    if (lookupErr) {
+      console.error("[settings.social.patch] lookup", lookupErr);
+      return res.status(500).json({ error: formatSupabaseWriteError(lookupErr) });
+    }
 
     if (!existing) {
       const insertPayload = {
@@ -137,9 +196,13 @@ export async function patchSocialMedia(req, res) {
         footer_text: "",
         social_media: normalized
       };
-      const inserted = await supabase.from("site_settings").insert(insertPayload).select("social_media").single();
-      if (inserted.error) throw inserted.error;
-      return res.json(mergeSocialMedia(inserted.data?.social_media));
+      const inserted = await supabase.from("site_settings").insert(insertPayload).select("social_media").maybeSingle();
+      if (inserted.error) {
+        console.error("[settings.social.patch] insert", inserted.error);
+        const msg = formatSupabaseWriteError(inserted.error);
+        return res.status(500).json({ error: msg });
+      }
+      return res.json(mergeSocialMedia(inserted.data?.social_media ?? normalized));
     }
 
     const updated = await supabase
@@ -147,13 +210,19 @@ export async function patchSocialMedia(req, res) {
       .update({ social_media: normalized })
       .eq("id", SETTINGS_ID)
       .select("social_media")
-      .single();
+      .maybeSingle();
 
-    if (updated.error) throw updated.error;
-    return res.json(mergeSocialMedia(updated.data?.social_media));
+    if (updated.error) {
+      console.error("[settings.social.patch] update", updated.error);
+      const msg = formatSupabaseWriteError(updated.error);
+      return res.status(500).json({ error: msg });
+    }
+
+    return res.json(mergeSocialMedia(updated.data?.social_media ?? normalized));
   } catch (error) {
-    console.error("[settings.social.patch] error", error);
-    return res.status(500).json({ error: "Server error" });
+    console.error("[settings.social.patch] unexpected", error);
+    const msg = error instanceof Error ? error.message : formatSupabaseWriteError(error);
+    return res.status(500).json({ error: msg || "Could not save social settings." });
   }
 }
 

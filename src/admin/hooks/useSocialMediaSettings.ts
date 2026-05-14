@@ -69,9 +69,11 @@ export function useSocialMediaSettings() {
   }, []);
 
   const flushSave = useCallback(async (): Promise<void> => {
-    await patchSocialMedia(draft);
-    setSaved(draft);
-    persist(draft);
+    const data = (await patchSocialMedia(draft)) as SocialMediaState;
+    const merged = { ...INITIAL, ...data };
+    setSaved(merged);
+    setDraft(merged);
+    persist(merged);
   }, [draft]);
 
   return {
