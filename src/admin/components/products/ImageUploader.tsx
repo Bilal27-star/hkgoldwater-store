@@ -62,6 +62,8 @@ export default function ImageUploader({
   const hasBlobPreviews = previews.length > 0;
   const renderUrls = hasBlobPreviews ? previews : existing ? [existing] : [];
   const emptyUi = renderUrls.length === 0;
+  /** True when we already have maxFiles picked (blob-backed); drives overlay vs sr-only input. */
+  const atMaxFiles = filesRef.current.length >= maxFiles;
 
   function revokePreviewUrls(urls: string[]) {
     urls.forEach((u) => {
@@ -74,14 +76,12 @@ export default function ImageUploader({
     const out: File[] = [];
     for (const file of raw) {
       if (!isLikelyImageFile(file)) {
-        toast.error("Please choose image files only.");
-        console.warn(DEBUG, "rejected non-image", file.name, file.type);
-        return [];
+        toast.error(`Skipped (not an image): ${file.name || "file"}`);
+        continue;
       }
       if (file.size > maxSizeMb * 1024 * 1024) {
-        toast.error(`Each image must be ${maxSizeMb}MB or smaller.`);
-        console.warn(DEBUG, "rejected large file", file.name, file.size);
-        return [];
+        toast.error(`Skipped (over ${maxSizeMb}MB): ${file.name || "file"}`);
+        continue;
       }
       out.push(file);
     }
@@ -180,33 +180,59 @@ export default function ImageUploader({
               : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
         }`}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif,image/*"
-          multiple
-          disabled={disabled}
-          tabIndex={-1}
-          className={
-            emptyUi
-              ? "absolute inset-0 z-10 block min-h-[220px] w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-              : "sr-only"
-          }
-          onChange={handleInputChange}
-        />
-
-        {!emptyUi ? (
+        {emptyUi ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif,image/*"
+              multiple
+              disabled={disabled}
+              tabIndex={-1}
+              className="absolute inset-0 z-10 block min-h-[220px] w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              onChange={handleInputChange}
+              aria-label="Upload product images, up to 4 files"
+            />
+            <div className="pointer-events-none relative z-0 flex min-h-[220px] w-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <ImageIcon className="h-7 w-7" aria-hidden />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Drag & drop images here</p>
+                <p className="mt-1 text-xs text-slate-500">or choose up to {maxFiles} files</p>
+              </div>
+              <span className="rounded-lg bg-[#1565C0] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B3D91]">
+                Upload from your device
+              </span>
+              <p className="text-xs text-slate-400">PNG, JPG, WebP — max {maxSizeMb}MB each</p>
+            </div>
+          </>
+        ) : (
           <div className="relative z-0 p-4">
-            <div className="relative mx-auto max-h-56 max-w-full overflow-hidden rounded-lg bg-white shadow-inner ring-1 ring-slate-200">
-              {renderUrls.map((src, i) => (
-                <img
-                  key={`${i}-${src}`}
-                  src={src}
-                  alt=""
-                  className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
-                  onError={src.startsWith("blob:") ? undefined : onProductImageError}
+            <div className="relative min-h-[200px] w-full">
+              {!disabled && !atMaxFiles ? (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif,image/*"
+                  multiple
+                  tabIndex={-1}
+                  className="absolute inset-0 z-10 block min-h-[200px] w-full cursor-pointer opacity-0"
+                  onChange={handleInputChange}
+                  aria-label={`Add more product images, up to ${maxFiles} total`}
                 />
-              ))}
+              ) : null}
+              <div className="relative z-0 mx-auto max-h-56 max-w-full overflow-hidden rounded-lg bg-white shadow-inner ring-1 ring-slate-200">
+                {renderUrls.map((src, i) => (
+                  <img
+                    key={`${i}-${src}`}
+                    src={src}
+                    alt=""
+                    className="mx-auto max-h-52 w-auto max-w-full object-contain transition-transform duration-300"
+                    onError={src.startsWith("blob:") ? undefined : onProductImageError}
+                  />
+                ))}
+              </div>
             </div>
             {!disabled && (
               <div className="relative z-20 mt-4 flex flex-wrap justify-center gap-2">
@@ -215,12 +241,16 @@ export default function ImageUploader({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    if (atMaxFiles) {
+                      toast.error(`You can upload up to ${maxFiles} images. Remove all to start over.`);
+                      return;
+                    }
                     triggerFileDialog("replace-button");
                   }}
                   className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-[#1565C0] hover:text-[#1565C0]"
                 >
                   <Upload className="h-4 w-4" aria-hidden />
-                  Replace image
+                  {atMaxFiles ? "Maximum images" : "Choose more files"}
                 </button>
                 <button
                   type="button"
@@ -236,20 +266,6 @@ export default function ImageUploader({
                 </button>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="pointer-events-none relative z-0 flex min-h-[220px] w-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-              <ImageIcon className="h-7 w-7" aria-hidden />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-slate-700">Drag & drop an image here</p>
-              <p className="mt-1 text-xs text-slate-500">or upload from your device</p>
-            </div>
-            <span className="rounded-lg bg-[#1565C0] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B3D91]">
-              Upload from your device
-            </span>
-            <p className="text-xs text-slate-400">PNG, JPG, WebP — max {maxSizeMb}MB</p>
           </div>
         )}
       </div>
