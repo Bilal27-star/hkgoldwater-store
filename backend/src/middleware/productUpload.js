@@ -23,9 +23,15 @@ export const productImagesUpload = multer({
   limits: { fileSize: 2 * 1024 * 1024 }
 });
 
+function isMultipartRequest(req) {
+  const ct = String(req.headers["content-type"] || "").toLowerCase();
+  // Prefer header check: req.is("multipart/form-data") can miss some clients/proxies.
+  return ct.includes("multipart/form-data");
+}
+
 /** Runs multer for multipart POST/PATCH so JSON bodies keep using express.json(). */
 export function multipartProductImages(req, res, next) {
-  if (req.is("multipart/form-data")) {
+  if (isMultipartRequest(req)) {
     return productImagesUpload.array("images", 4)(req, res, next);
   }
   next();

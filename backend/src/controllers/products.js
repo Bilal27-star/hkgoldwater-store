@@ -110,36 +110,42 @@ async function fetchProductImageUrls(supabase, productId) {
   const res = await supabase
     .from("product_images")
     .select("url, image_url, sort_order")
-    .eq("product_id", productId);
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
   if (res.error || !Array.isArray(res.data)) return [];
-  return [...res.data]
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    .map((r) => r.url || r.image_url)
-    .filter(Boolean);
+  return res.data.map((r) => r.url || r.image_url).filter(Boolean);
+}
+
+/**
+ * Insert one gallery row; try column shapes common across schemas (image_url vs url).
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} productId
+ * @param {string} pathOrUrl
+ * @param {number} sortOrder
+ */
+async function insertOneProductImageRow(supabase, productId, pathOrUrl, sortOrder) {
+  const base = { product_id: productId, sort_order: sortOrder };
+  const tries = [
+    { ...base, image_url: pathOrUrl },
+    { ...base, url: pathOrUrl },
+    { ...base, url: pathOrUrl, image_url: pathOrUrl }
+  ];
+  let lastErr = null;
+  for (const row of tries) {
+    const ins = await supabase.from("product_images").insert(row);
+    if (!ins.error) return;
+    lastErr = ins.error;
+  }
+  throw lastErr || new Error("product_images insert failed");
 }
 
 async function persistProductImages(supabase, productId, urls) {
   const clean = (Array.isArray(urls) ? urls : []).map((u) => String(u || "").trim()).filter(Boolean);
   if (!clean.length) return;
 
-  const rowsWithUrl = clean.map((url, i) => ({
-    product_id: productId,
-    url,
-    sort_order: i
-  }));
-  const rowsWithImageUrl = clean.map((image_url, i) => ({
-    product_id: productId,
-    image_url,
-    sort_order: i
-  }));
-
-  let ins = await supabase.from("product_images").insert(rowsWithUrl);
-  if (ins.error) {
-    ins = await supabase.from("product_images").insert(rowsWithImageUrl);
-  }
-  if (ins.error) {
-    console.error("[products] product_images bulk insert failed", ins.error);
-    throw ins.error;
+  // One round-trip per file: bulk inserts can fail on some schemas/RLS; sequential is reliable.
+  for (let i = 0; i < clean.length; i++) {
+    await insertOneProductImageRow(supabase, productId, clean[i], i);
   }
 }
 
@@ -162,7 +168,8 @@ export async function listProducts(req, res) {
       const imgRes = await supabase
         .from("product_images")
         .select("product_id, url, image_url, sort_order")
-        .in("product_id", ids);
+        .in("product_id", ids)
+        .order("sort_order", { ascending: true });
       if (!imgRes.error && Array.isArray(imgRes.data)) {
         const byPid = {};
         for (const row of imgRes.data) {
@@ -313,6 +320,12 @@ export async function createProduct(req, res) {
     if (storagePaths.length) {
       try {
         await persistProductImages(supabase, attempt.data.id, storagePaths);
+        const inserted = await fetchProductImageUrls(supabase, attempt.data.id);
+        if (inserted.length < storagePaths.length) {
+          throw new Error(
+            `product_images: expected ${storagePaths.length} gallery row(s), found ${inserted.length}. Check columns (url / image_url), RLS, and unique constraints on product_id.`
+          );
+        }
       } catch (imgErr) {
         console.error("[products.create] product_images persist failed", imgErr);
         try {
@@ -503,6 +516,12 @@ export async function updateProduct(req, res) {
       if (delImg.error) throw delImg.error;
       try {
         await persistProductImages(supabase, id, storagePaths);
+        const inserted = await fetchProductImageUrls(supabase, id);
+        if (inserted.length < storagePaths.length) {
+          throw new Error(
+            `product_images: expected ${storagePaths.length} gallery row(s), found ${inserted.length}. Check columns (url / image_url), RLS, and unique constraints on product_id.`
+          );
+        }
       } catch (imgErr) {
         console.error("[products.update] product_images persist failed", imgErr);
         const message =
