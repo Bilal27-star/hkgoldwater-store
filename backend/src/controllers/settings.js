@@ -23,6 +23,26 @@ function cloneSocialDefaults() {
   return JSON.parse(JSON.stringify(DEFAULT_SOCIAL_MEDIA));
 }
 
+function socialEntryString(entry, keys) {
+  if (!entry || typeof entry !== "object") return "";
+  for (const k of keys) {
+    const v = entry[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function coerceEnabled(raw) {
+  if (raw === false || raw === 0) return false;
+  if (raw === true || raw === 1) return true;
+  if (typeof raw === "string") {
+    const s = raw.trim().toLowerCase();
+    if (s === "false" || s === "0" || s === "") return false;
+    if (s === "true" || s === "1") return true;
+  }
+  return Boolean(raw);
+}
+
 function mergeSocialMedia(raw) {
   const base = cloneSocialDefaults();
   if (!raw || typeof raw !== "object") return base;
@@ -30,8 +50,8 @@ function mergeSocialMedia(raw) {
     const entry = raw[id];
     if (entry && typeof entry === "object") {
       base[id] = {
-        enabled: Boolean(entry.enabled),
-        value: typeof entry.value === "string" ? entry.value.trim() : ""
+        enabled: coerceEnabled(entry.enabled),
+        value: socialEntryString(entry, ["value", "url", "link", "href"])
       };
     }
   }

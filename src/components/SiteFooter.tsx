@@ -7,16 +7,32 @@ import { useSiteContent } from "../hooks/useSiteContent";
 import Logo from "../assets/logo.png";
 
 function whatsappHref(phone: string) {
-  const digits = String(phone).replace(/\D/g, "");
+  const t = String(phone).trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("//")) return `https:${t}`;
+  const digits = t.replace(/\D/g, "");
   if (!digits) return "";
   return `https://wa.me/${digits}`;
 }
 
 function webHref(raw: string) {
-  const t = String(raw).trim();
+  let t = String(raw).trim();
   if (!t) return "";
   if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("//")) return `https:${t}`;
+  t = t.replace(/^\/+/, "");
   return `https://${t}`;
+}
+
+function socialEntryRaw(entry: SocialMediaState[SocialPlatformId] | undefined): string {
+  if (!entry || typeof entry !== "object") return "";
+  const o = entry as Record<string, unknown>;
+  for (const k of ["value", "url", "link", "href"] as const) {
+    const v = o[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
 }
 
 const FOOTER_SOCIAL_ORDER: { id: SocialPlatformId; Icon: typeof FaFacebook; label: string }[] = [
@@ -31,7 +47,7 @@ function countRenderableSocialLinks(social: SocialMediaState): number {
   for (const { id } of FOOTER_SOCIAL_ORDER) {
     const entry = social[id];
     if (!entry?.enabled) continue;
-    const raw = String(entry.value || "").trim();
+    const raw = socialEntryRaw(entry);
     if (!raw) continue;
     const href = id === "whatsapp" ? whatsappHref(raw) : webHref(raw);
     if (href) n += 1;
@@ -52,7 +68,7 @@ function FooterSocialRow({ social }: { social: SocialMediaState | null }) {
   const links = FOOTER_SOCIAL_ORDER.map(({ id, Icon, label }) => {
     const entry = merged[id];
     if (!entry?.enabled) return null;
-    const raw = String(entry.value || "").trim();
+    const raw = socialEntryRaw(entry);
     if (!raw) return null;
     const href = id === "whatsapp" ? whatsappHref(raw) : webHref(raw);
     if (!href) return null;

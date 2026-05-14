@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 
@@ -102,7 +103,11 @@ export async function uploadProductFilesToStorage(supabase, files) {
   const out = [];
   for (const f of files) {
     const diskPath = f.path;
-    const objectPath = productObjectPath(f.filename);
+    const ext =
+      path.extname(f.originalname || "") || path.extname(f.filename || "") || ".jpg";
+    const safeExt = ext.length <= 12 && /^\.[a-z0-9.]+$/i.test(ext) ? ext : ".jpg";
+    // Unique object key per file (do not derive only from multer name — avoids duplicate paths).
+    const objectPath = `${PRODUCTS_OBJECT_PREFIX}/${randomUUID()}${safeExt}`;
     const buf = await fs.readFile(diskPath);
     const contentType = f.mimetype || "application/octet-stream";
     const { error } = await supabase.storage.from(PRODUCTS_BUCKET).upload(objectPath, buf, {

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import fs from "fs";
 import multer from "multer";
 import path from "path";
@@ -12,7 +13,8 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, productImagesUploadDir),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "") || ".jpg";
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    // One unique disk name per file (Date.now()+Math.random can collide in the same ms).
+    cb(null, `${randomUUID()}${ext}`);
   }
 });
 
