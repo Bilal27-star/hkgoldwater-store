@@ -119,17 +119,27 @@ async function fetchProductImageUrls(supabase, productId) {
 }
 
 async function persistProductImages(supabase, productId, urls) {
-  for (let i = 0; i < urls.length; i++) {
-    const row = { product_id: productId, url: urls[i], sort_order: i };
-    let ins = await supabase.from("product_images").insert(row);
-    if (ins.error) {
-      ins = await supabase.from("product_images").insert({
-        product_id: productId,
-        image_url: urls[i],
-        sort_order: i
-      });
-      if (ins.error) console.error("[products] product_images insert failed", ins.error);
-    }
+  const clean = (Array.isArray(urls) ? urls : []).map((u) => String(u || "").trim()).filter(Boolean);
+  if (!clean.length) return;
+
+  const rowsWithUrl = clean.map((url, i) => ({
+    product_id: productId,
+    url,
+    sort_order: i
+  }));
+  const rowsWithImageUrl = clean.map((image_url, i) => ({
+    product_id: productId,
+    image_url,
+    sort_order: i
+  }));
+
+  let ins = await supabase.from("product_images").insert(rowsWithUrl);
+  if (ins.error) {
+    ins = await supabase.from("product_images").insert(rowsWithImageUrl);
+  }
+  if (ins.error) {
+    console.error("[products] product_images bulk insert failed", ins.error);
+    throw ins.error;
   }
 }
 
@@ -154,13 +164,16 @@ export async function listProducts(req, res) {
         .select("product_id, url, image_url, sort_order")
         .in("product_id", ids);
       if (!imgRes.error && Array.isArray(imgRes.data)) {
-        const sorted = [...imgRes.data].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-        for (const row of sorted) {
-          const u = row.url || row.image_url;
-          if (!u) continue;
+        const byPid = {};
+        for (const row of imgRes.data) {
           const pid = row.product_id;
-          if (!imagesByProduct[pid]) imagesByProduct[pid] = [];
-          imagesByProduct[pid].push(u);
+          if (!pid) continue;
+          if (!byPid[pid]) byPid[pid] = [];
+          byPid[pid].push(row);
+        }
+        for (const pid of Object.keys(byPid)) {
+          const sorted = [...byPid[pid]].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+          imagesByProduct[pid] = sorted.map((r) => r.url || r.image_url).filter(Boolean);
         }
       }
     }
@@ -298,7 +311,24 @@ export async function createProduct(req, res) {
     }
 
     if (storagePaths.length) {
-      await persistProductImages(supabase, attempt.data.id, storagePaths);
+      try {
+        await persistProductImages(supabase, attempt.data.id, storagePaths);
+      } catch (imgErr) {
+        console.error("[products.create] product_images persist failed", imgErr);
+        try {
+          await supabase.from("products").delete().eq("id", attempt.data.id);
+        } catch (delErr) {
+          console.error("[products.create] rollback delete failed", delErr);
+        }
+        try {
+          await removeProductPathsFromStorage(supabase, storagePaths);
+        } catch (rmErr) {
+          console.error("[products.create] rollback storage remove failed", rmErr);
+        }
+        const message =
+          imgErr instanceof Error ? imgErr.message : "Failed to save product gallery images";
+        return res.status(500).json({ error: message });
+      }
     }
 
     const createdProduct = await supabase
@@ -314,8 +344,15 @@ export async function createProduct(req, res) {
     }
 
     console.log("DB RESPONSE:", createdProduct.data);
-    let mergedUrls = storagePaths.length > 0 ? [...storagePaths] : [];
-    if (!mergedUrls.length && resolvedPrimaryImage) mergedUrls = [resolvedPrimaryImage];
+    const galleryFromDb = await fetchProductImageUrls(supabase, attempt.data.id);
+    let mergedUrls =
+      galleryFromDb.length > 0
+        ? galleryFromDb
+        : storagePaths.length > 0
+          ? [...storagePaths]
+          : resolvedPrimaryImage
+            ? [resolvedPrimaryImage]
+            : [];
     const product = mapRowToApiProduct(createdProduct.data, mergedUrls);
     console.log("Created product:", product);
     return res.status(201).json(product);
@@ -464,7 +501,14 @@ export async function updateProduct(req, res) {
     if (storagePaths.length) {
       const delImg = await supabase.from("product_images").delete().eq("product_id", id);
       if (delImg.error) throw delImg.error;
-      await persistProductImages(supabase, id, storagePaths);
+      try {
+        await persistProductImages(supabase, id, storagePaths);
+      } catch (imgErr) {
+        console.error("[products.update] product_images persist failed", imgErr);
+        const message =
+          imgErr instanceof Error ? imgErr.message : "Failed to save product gallery images";
+        return res.status(500).json({ error: message });
+      }
     }
 
     const extraUrls = await fetchProductImageUrls(supabase, id);

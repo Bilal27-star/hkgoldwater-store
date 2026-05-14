@@ -82,10 +82,7 @@ export default function ProductDetailPage() {
           : mainImage
             ? [toDisplay(mainImage)]
             : [PRODUCT_IMAGE_FALLBACK_SRC];
-        const galleryImages =
-          images.length === 1
-            ? [images[0], images[0], images[0], images[0]]
-            : images;
+        const galleryImages = images;
         setProduct({
           id: String((row as any).id),
           images: galleryImages,
